@@ -1,5 +1,7 @@
 import { loadEnv, defineConfig } from "@medusajs/framework/utils";
 
+type CookieSameSite = "none" | "lax" | "strict";
+
 type ViteAlias = {
   find: string | RegExp;
   replacement: string;
@@ -77,6 +79,23 @@ const parseBooleanEnv = (value: string | undefined, fallback: boolean) => {
   return ["1", "true", "yes", "on"].includes(value.toLowerCase());
 };
 
+const parseCookieSameSite = (
+  value: string | undefined,
+  fallback: CookieSameSite,
+): CookieSameSite => {
+  if (!value) {
+    return fallback;
+  }
+
+  const normalized = value.toLowerCase();
+
+  if (["none", "lax", "strict"].includes(normalized)) {
+    return normalized as CookieSameSite;
+  }
+
+  throw new Error("COOKIE_SAME_SITE must be one of: none, lax, strict");
+};
+
 const PUBLIC_URL = stripTrailingSlash(getRequiredEnv("PUBLIC_BACKEND_URL"));
 const MEDUSA_BACKEND_URL = stripTrailingSlash(
   getRequiredEnv("MEDUSA_BACKEND_URL"),
@@ -110,7 +129,10 @@ const cookieSecure = parseBooleanEnv(
   process.env.COOKIE_SECURE,
   isHttpsUrl(PUBLIC_URL),
 );
-const cookieSameSite = process.env.COOKIE_SAME_SITE || (cookieSecure ? "none" : "lax");
+const cookieSameSite = parseCookieSameSite(
+  process.env.COOKIE_SAME_SITE,
+  cookieSecure ? "none" : "lax",
+);
 
 if (cookieSameSite === "none" && !cookieSecure) {
   throw new Error("COOKIE_SAME_SITE=none requires COOKIE_SECURE=true");
