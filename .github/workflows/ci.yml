@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Medusa monorepo
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Prepare CI env files
+        run: |
+          cat > apps/backend/.env <<'EOF'
+          PUBLIC_BACKEND_URL=https://backend.example.test
+          PUBLIC_ASSET_BASE_URL=https://backend.example.test
+          MEDUSA_BACKEND_URL=https://backend.example.test
+          MEDUSA_ADMIN_BACKEND_URL=https://backend.example.test
+          DATABASE_URL=postgres://postgres:postgres@postgres:5432/medusa-store
+          REDIS_URL=redis://redis:6379
+          CACHE_REDIS_URL=redis://redis:6379
+          LOCKING_REDIS_URL=redis://redis:6379
+          STORE_CORS=https://storefront.example.test,https://backend.example.test
+          ADMIN_CORS=https://backend.example.test
+          AUTH_CORS=https://backend.example.test
+          JWT_SECRET=ci-jwt-secret-ci-jwt-secret-ci-jwt-secret-ci-jwt-secret
+          COOKIE_SECRET=ci-cookie-secret-ci-cookie-secret-ci-cookie-secret
+          DISABLE_MEDUSA_ADMIN=false
+          MEDUSA_WORKER_MODE=server
+          MEDUSA_ADMIN_ONBOARDING_TYPE=default
+          PORT=9000
+          EMAIL_PROVIDER=local
+          EMAIL_ENABLED=false
+          PAYPAL_ENVIRONMENT=sandbox
+          PAYPAL_AUTO_CAPTURE=false
+          EOF
+
+          cat > apps/storefront/.env <<'EOF'
+          NEXT_PUBLIC_MEDUSA_BACKEND_URL=https://backend.example.test
+          MEDUSA_BACKEND_URL=https://backend.example.test
+          NEXT_PUBLIC_BASE_URL=https://storefront.example.test
+          NEXT_PUBLIC_DEFAULT_REGION=ca
+          NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=pk_test_ci
+          NEXT_PUBLIC_STRIPE_KEY=
+          NEXT_PUBLIC_PAYPAL_CLIENT_ID=
+          NEXT_PUBLIC_ASSET_BASE_URL=https://backend.example.test
+          MEDUSA_CLOUD_S3_HOSTNAME=
+          MEDUSA_CLOUD_S3_PATHNAME=
+          EOF
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate env and public URLs
+        run: |
+          pnpm check-env
+          pnpm check-no-localhost
+
+      - name: Build backend
+        run: pnpm --filter @dtc/backend build
+
+      - name: Validate Medusa admin build output
+        run: node scripts/check-medusa-build-output.js
+
+      - name: Build storefront
+        run: pnpm --filter @dtc/storefront build
+
+      - name: Validate public URL output
+        run: pnpm check:public-urls
+
+      - name: Validate production compose config
+        run: |
+          docker compose config > /tmp/docker-compose-rendered.yaml
+          if grep -q "target: /server" /tmp/docker-compose-rendered.yaml; then
+            echo "Production compose must not bind-mount /server"
+            exit 1
+          fi
+          if grep -q 'published: "5173"' /tmp/docker-compose-rendered.yaml; then
+            echo "Production compose must not expose Vite HMR port 5173"
+            exit 1
+          fi
+          if grep -q "NODE_ENV: development" /tmp/docker-compose-rendered.yaml; then
+            echo "Production compose must not run with NODE_ENV=development"
+            exit 1
+          fi
+
+      - name: Build production Docker images
+        run: docker compose build --no-cache medusa storefront
