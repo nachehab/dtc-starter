@@ -6,13 +6,22 @@ const path = require("path")
 const root = process.cwd()
 const backend = path.join(root, "apps", "backend")
 
-const expected = path.join(backend, ".medusa/server/public/admin/index.html")
+const candidates = [
+  path.join(backend, ".medusa", "admin", "index.html"),
+  path.join(backend, ".medusa", "server", "public", "admin", "index.html"),
+]
 
 console.log("Checking Medusa admin build output...")
 
-if (!fs.existsSync(expected)) {
-  console.error("Missing admin build:", expected)
+const found = candidates.find((candidate) => fs.existsSync(candidate))
+
+if (!found) {
+  console.error("Missing Medusa admin build. Checked:")
+  for (const candidate of candidates) {
+    console.error(`- ${candidate}`)
+  }
+  console.error("Run `pnpm --filter @dtc/backend build` before starting production, and keep DISABLE_MEDUSA_ADMIN=false when the admin should be served by Medusa.")
   process.exit(1)
 }
 
-console.log("OK: admin build present")
+console.log(`OK: admin build present at ${found}`)
