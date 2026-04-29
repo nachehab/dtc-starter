@@ -11,6 +11,12 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     networks:
       - medusa_network
 
@@ -20,6 +26,12 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
     networks:
       - medusa_network
 
@@ -32,16 +44,25 @@ services:
     container_name: medusa_backend
     restart: unless-stopped
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     working_dir: /app
     ports:
       - "9000:9000"
     environment:
       NODE_ENV: production
       PORT: 9000
+      HEALTHCHECK_URL: http://127.0.0.1:9000/health
     env_file:
       - apps/backend/.env
+    healthcheck:
+      test: ["CMD", "node", "/app/scripts/check-medusa-health.js"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     networks:
       - medusa_network
 
@@ -54,7 +75,8 @@ services:
     container_name: medusa_storefront
     restart: unless-stopped
     depends_on:
-      - medusa
+      medusa:
+        condition: service_healthy
     working_dir: /server/apps/storefront
     ports:
       - "8000:8000"
@@ -63,6 +85,12 @@ services:
       PORT: 8000
     env_file:
       - apps/storefront/.env
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"const http=require('http');const req=http.get('http://127.0.0.1:8000/',res=>process.exit(res.statusCode<500?0:1));req.on('error',()=>process.exit(1));req.setTimeout(5000,()=>req.destroy());\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     networks:
       - medusa_network
 
