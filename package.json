@@ -1,9 +1,9 @@
 {
   "name": "dtc-starter-monorepo",
   "private": true,
-  "packageManager": "pnpm@10.11.1",
+  "packageManager": "pnpm@10.33.2",
   "engines": {
-    "node": ">=20 <21"
+    "node": ">=22 <23"
   },
   "scripts": {
     "dev": "turbo dev",
@@ -19,6 +19,8 @@
     "storefront:dev": "turbo dev --filter=@dtc/storefront",
     "healthcheck": "node scripts/check-medusa-health.js",
     "check:medusa-build-output": "node scripts/check-medusa-build-output.js",
+    "check:versions": "node scripts/check-runtime-versions.js",
+    "outdated": "pnpm outdated -r",
     "docker:up": "docker compose up -d --build",
     "docker:dev": "docker compose -f docker-compose.yaml -f docker-compose.dev.yaml --profile dev up",
     "docker:logs": "docker compose logs -f",
@@ -30,6 +32,7 @@
   },
   "pnpm": {
     "overrides": {
+      "@types/node": "22.19.0",
       "@types/react": "19.0.5",
       "@types/react-dom": "19.0.5",
       "zod": "4.2.0"
