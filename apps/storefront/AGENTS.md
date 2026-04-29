@@ -1,12 +1,20 @@
-# Storefront Agent Guide
+# Storefront AGENTS.md — Next.js Storefront Compliance
 
-Scope: `apps/storefront`, the Next.js storefront.
+Scope: `apps/storefront`, the Next.js storefront, checkout UI, product pages, client-safe SDK usage, browser asset handling, and storefront Docker image.
 
-Read `README.md`, `../../README.md`, and `../../AGENTS.md` before changing storefront build, env, checkout, image, or Docker behavior.
+Read `../../AGENTS.md`, `../../README.md`, and this file before changing storefront env, checkout, image, Docker, or public URL behavior.
 
-## Storefront Env Reference
+## Security baseline
 
-Storefront env belongs in `apps/storefront/.env`. Use `apps/storefront/.env.example`, `.env.template`, `.env.development.template`, or `.env.production.template` as references. Do not commit real secrets.
+- Never commit real `apps/storefront/.env` values containing secrets.
+- Treat every `NEXT_PUBLIC_*` value as public and browser-visible.
+- Never place PayPal secrets, webhook IDs, SMTP credentials, Medusa secrets, database URLs, Redis URLs, cookie secrets, JWT secrets, or backend private URLs in storefront env or code.
+- Do not log customer personal information, payment details, cart tokens, auth tokens, cookies, or checkout secrets.
+- Do not bypass CORS/auth errors by switching browser-facing URLs to Docker service names, localhost, LAN IPs, or HTTP origins.
+
+## Storefront env reference
+
+Storefront env belongs in `apps/storefront/.env`. Templates may be committed; real values stay local.
 
 Browser-exposed values:
 
@@ -32,92 +40,95 @@ Optional image host settings:
 
 Rules:
 
-- Every `NEXT_PUBLIC_*` value is bundled into browser-visible code.
-- `NEXT_PUBLIC_MEDUSA_BACKEND_URL` must be a public HTTPS backend/admin origin.
+- `NEXT_PUBLIC_MEDUSA_BACKEND_URL` must be a public HTTPS backend/admin origin for deployed browser use.
 - `NEXT_PUBLIC_BASE_URL` must be a public HTTPS storefront origin.
 - `NEXT_PUBLIC_ASSET_BASE_URL` must be a public HTTPS asset/backend origin when set.
-- Do not place PayPal secrets, Medusa secrets, SMTP credentials, database URLs, Redis URLs, or cookie/JWT secrets in storefront env.
+- `MEDUSA_BACKEND_URL` may be server-only, but should not cause generated browser assets to contain Docker-only URLs.
 - Do not use localhost, loopback, LAN IPs, Docker service names, or random dev ports in browser-facing values.
 
-## Next.js Build Rules
+## Next.js compliance rules
 
 - Keep the storefront runtime in `apps/storefront`.
 - Do not move scripts or runtime paths to the monorepo root.
-- Treat production build failures as blockers.
-- A successful compile is not enough: `next build` can still fail during lint or type validation.
-- Fix lint and type issues directly. Do not disable lint globally to pass a build.
-- Rebuild Docker after Dockerfile, package, lockfile, or build-time public env changes.
-- Clear `.next` or rebuild the image when public env values change and stale bundles are suspected.
+- Do not import backend-only modules, Node-only secrets, or server-only envs into client components.
+- Treat production build, lint, and TypeScript failures as blockers.
+- Fix lint and type errors directly. Do not disable lint globally to pass a build.
+- Prefer explicit types for products, carts, regions, checkout sessions, and payment flows.
+- Use `unknown` plus runtime narrowing for untrusted API responses.
+- Avoid broad `as any` casts. Narrow casts must be local and justified.
 
-Safe commands from the repo root:
+## Module agents
 
-```sh
-pnpm --filter @dtc/storefront lint
-pnpm --filter @dtc/storefront build
-docker compose build --no-cache storefront
-docker compose up -d storefront
-```
+### Public URL and asset agent
 
-## PayPal Browser Rules
+Responsibilities:
 
-- The only PayPal browser env currently expected here is `NEXT_PUBLIC_PAYPAL_CLIENT_ID`.
-- Never expose `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`, or backend API credentials to storefront code.
-- Keep PayPal service files explicitly typed.
-- Avoid `any`; use explicit SDK types or `unknown` with runtime narrowing.
-- Ensure checkout code handles missing PayPal public client ID gracefully when PayPal is disabled.
-- Keep backend payment creation, capture, and webhook handling on the Medusa backend.
+- Ensure product images, `/static` URLs, and Medusa upload URLs resolve to browser-reachable public HTTPS origins.
+- Normalize asset URLs through public backend/asset origin helpers before rendering.
+- Prevent `http://medusa:9000`, `localhost`, LAN IPs, or private origins from appearing in generated HTML/JS.
+- Rebuild Docker or clear stale `.next` output when public env values change.
 
-## Asset URL and Public Backend URL Rules
-
-- Product image URLs, `/static` URLs, and Medusa upload URLs must resolve to browser-reachable public HTTPS origins.
-- Use `NEXT_PUBLIC_MEDUSA_BACKEND_URL` and `NEXT_PUBLIC_ASSET_BASE_URL` for browser-facing backend and asset references.
-- Do not let container-only URLs such as `http://medusa:9000` reach client components, generated HTML, image config, or JavaScript bundles.
-- When backend public asset settings change, rebuild or clear stale storefront build output.
-- Run leak checks after frontend/admin builds:
+Validation:
 
 ```sh
 npm run check-no-localhost
 npm run check:public-urls
 ```
 
-## Lint and Type Expectations
+### Checkout/payment UI agent
 
-- Prefer explicit types for Medusa SDK, PayPal SDK, cart, checkout, product, and region data.
-- Use `unknown` plus type narrowing for untrusted API responses.
-- Avoid broad `as any` casts.
-- Do not silence `no-explicit-any` globally.
-- Narrow ESLint disables are acceptable only with a short reason and only when the type cannot be expressed cleanly.
-- Keep code modular by feature area: checkout logic, PayPal components, product data, and URL helpers should not be collapsed into one large file.
+Responsibilities:
 
-## Common Failure: `no-explicit-any` in PayPal Service
+- Keep backend payment creation, capture, and webhook handling on the Medusa backend.
+- Storefront may use public client IDs only, such as `NEXT_PUBLIC_PAYPAL_CLIENT_ID`.
+- Never expose `PAYPAL_CLIENT_SECRET`, webhook IDs, provider credentials, or backend tokens.
+- Checkout components must handle disabled/missing PayPal public client ID gracefully.
+- Payment UI should fail closed with a useful customer-safe message, not leak stack traces or credentials.
 
-Checklist:
+### Medusa SDK/data agent
 
-- Replace `any` with PayPal SDK types when available.
-- If SDK types are unavailable, define a local minimal interface for the fields used.
-- For unknown response payloads, use `unknown` and check object shape before reading fields.
-- Keep browser-safe PayPal values limited to `NEXT_PUBLIC_PAYPAL_CLIENT_ID`.
+Responsibilities:
 
-Validation:
+- Use the public Medusa backend URL and publishable API key as documented by Medusa storefront patterns.
+- Keep customer/cart tokens client-safe and never print them in logs.
+- Do not bypass Medusa auth/session behavior by calling private admin APIs from the storefront.
+- Keep data fetching typed and scoped to storefront-safe endpoints.
 
-```sh
-pnpm --filter @dtc/storefront lint
-pnpm --filter @dtc/storefront build
-```
+### Docker storefront agent
 
-## Common Failure: Build Fails After Successful Compile
+Responsibilities:
 
-Likely cause: Next.js compiled pages, then lint or TypeScript validation failed.
+- Storefront Dockerfile builds only the storefront package.
+- Runtime should start from the storefront app root with `pnpm start`.
+- Production compose must not bind-mount source or expose dev/HMR ports.
+- Healthcheck should verify the Next.js server responds without relying on extra Alpine packages.
 
-Checklist:
+## Safe commands
 
-- Read the first lint/type error after the compile output.
-- Fix the source issue instead of disabling validation globally.
-- Re-run lint before build for faster feedback:
+From repo root:
 
 ```sh
 pnpm --filter @dtc/storefront lint
 pnpm --filter @dtc/storefront build
+docker compose build --no-cache storefront
+docker compose up -d storefront
+docker logs medusa_storefront --tail=150
 ```
 
-- If the error mentions env values, inspect `apps/storefront/.env` and confirm public values are HTTPS public origins.
+## Common failures
+
+### `no-explicit-any` in payment or SDK code
+
+- Replace `any` with SDK types when available.
+- If SDK types are unavailable, define a minimal local interface for the fields used.
+- Use `unknown` and object-shape checks for external payloads.
+
+### Build fails after successful compile
+
+- Read the first lint/type error after compile output.
+- Run lint separately for faster feedback.
+- Check env values if the error references URL, image, or metadata config.
+
+### Browser requests `http://medusa:9000`
+
+This is a public URL leak. Fix env/config so browser-facing values use public HTTPS origins. Docker service names are internal only.
