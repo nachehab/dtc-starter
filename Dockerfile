@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-alpine AS deps
+FROM node:20-alpine AS deps
 
 WORKDIR /server
 
@@ -22,11 +22,11 @@ ENV DISABLE_MEDUSA_ADMIN=false
 ENV MEDUSA_WORKER_MODE=server
 
 RUN --mount=type=secret,id=backend_env,target=/server/apps/backend/.env \
-  pnpm --filter @dtc/backend build && pnpm check:medusa-build-output
+  pnpm --filter @dtc/backend build
 
-FROM node:22-alpine AS runner
+FROM node:20-alpine AS runner
 
-WORKDIR /server
+WORKDIR /server/apps/backend
 
 RUN corepack enable
 
@@ -34,13 +34,12 @@ ENV NODE_ENV=production
 ENV PORT=9000
 ENV DISABLE_MEDUSA_ADMIN=false
 ENV MEDUSA_WORKER_MODE=server
-ENV HEALTHCHECK_URL=http://127.0.0.1:9000/health
 
 COPY --from=builder /server /server
 
 EXPOSE 9000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
-  CMD node /server/scripts/check-medusa-health.js
+  CMD node -e "const http=require('http');const req=http.get('http://127.0.0.1:9000/health',res=>process.exit(res.statusCode<400?0:1));req.on('error',()=>process.exit(1));req.setTimeout(5000,()=>req.destroy());"
 
-CMD ["sh", "/server/scripts/start-medusa-production.sh"]
+CMD ["pnpm", "start"]

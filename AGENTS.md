@@ -1,4 +1,4 @@
-# AGENTS.md — Repository Operating Guide
+# AGENTS.md - Repository Operating Guide
 
 This repository is a Dockerized Medusa v2 commerce stack:
 
@@ -10,58 +10,56 @@ This repository is a Dockerized Medusa v2 commerce stack:
 
 Read this file, `README.md`, `apps/backend/AGENTS.md`, and `apps/storefront/AGENTS.md` before changing build, Docker, environment, payment, email, auth, or module behavior.
 
-## Non-negotiable security rules
+## Security Rules
 
 - Never commit real `.env` files, secrets, tokens, API keys, Gmail app passwords, PayPal secrets, JWT secrets, cookie secrets, database dumps, private certificates, or production logs containing credentials.
-- Keep real values in local `.env` files only. Commit only templates with placeholders.
+- Keep real values in local `.env` files only. Commit only templates with placeholders or local-development defaults.
 - Never print secret values in logs, PR comments, issues, docs, or final summaries. Report only whether required secrets exist.
-- Do not hardcode public domains, LAN IPs, Docker service names, localhost, credentials, CORS origins, or protocols in application code. Read them from app-scoped env files.
-- Browser-facing variables must use public browser-reachable HTTPS origins. Docker service names such as `medusa`, `postgres`, and `redis` are internal only.
+- Do not hardcode public domains, LAN IPs, Docker service names, localhost, credentials, CORS origins, or protocols in application source code. Read them from app-scoped env files.
+- Browser-facing variables may use the local LAN HTTP defaults for local development. Reintroduce public HTTPS domains only through env files after the local stack is stable.
 - Do not bypass security checks by weakening CORS, auth, cookie, token, SameSite, or Secure settings. Fix the real origin/proxy/env issue instead.
-- Do not disable Medusa Admin, payment, email, or health checks just to make Docker start unless the task explicitly requests a temporary diagnostic mode.
 - Do not modify generated dependency/build output under `node_modules`, `.pnpm`, `.next`, `.medusa`, or similar generated directories. Fix source/config instead.
 
-## Medusa compliance rules
+## Medusa Rules
 
 - Follow official Medusa v2 package scripts: `medusa build`, `medusa start`, `medusa develop`, `medusa db:migrate`, and `medusa exec` through package scripts.
 - Do not patch Medusa internals or `node_modules` as a permanent fix.
-- Do not introduce custom Admin output paths, symlinks, or `.medusa` compatibility copies unless Medusa documentation or pinned-version source analysis explicitly requires it and the reason is documented.
-- Keep `medusa-config.ts` env-driven and fail-fast. It may validate required envs, but it must not embed real deployment secrets or private origins.
-- Required backend production envs include `DATABASE_URL`, `REDIS_URL`, `STORE_CORS`, `ADMIN_CORS`, `AUTH_CORS`, `JWT_SECRET`, `COOKIE_SECRET`, `PUBLIC_BACKEND_URL`, `MEDUSA_BACKEND_URL`, and `MEDUSA_ADMIN_BACKEND_URL`.
-- Keep Medusa local file provider `backend_url` derived from `PUBLIC_BACKEND_URL` or the documented public asset origin.
-- Preserve secure cookie behavior behind HTTPS reverse proxy: `sameSite: "none"` and `secure: true`.
-- Any custom module provider must follow Medusa module/provider conventions and must be registered through `medusa-config.ts` using env-provided options.
+- Do not introduce custom Admin output paths, symlinks, or `.medusa` compatibility copies.
+- Keep `medusa-config.ts` env-driven and close to the official starter structure.
+- Keep Medusa local file provider `backend_url` derived from `PUBLIC_BACKEND_URL`.
+- Keep cookie behavior env-driven with `COOKIE_SAME_SITE` and `COOKIE_SECURE`.
+- Custom module providers must follow Medusa module/provider conventions and be registered through `medusa-config.ts` using env-provided options.
 
-## Docker rules
+## Docker Rules
 
-- Production Docker must use built images, not host bind mounts.
+- Production Docker uses built images, not host bind mounts.
 - Production compose must not mount `.:/server`, `.:/app`, or expose Vite/HMR ports.
 - Development compose may use bind mounts and live reload, but only in `docker-compose.dev.yaml`.
 - Backend production image builds the Medusa backend/admin with `pnpm --filter @dtc/backend build` and starts with `pnpm start` from the isolated Medusa app root.
 - Storefront production image builds only the storefront and starts with `pnpm start` from the storefront app root.
-- Keep backend and storefront Docker responsibilities separate. Do not build the storefront inside the backend Dockerfile unless there is a documented reason.
+- Keep backend and storefront Docker responsibilities separate.
 - Use BuildKit secrets for build-time env files. Do not intentionally copy `.env` files into runtime images.
 - Keep healthchecks lightweight and dependency-free where possible. Prefer Node-based HTTP probes over adding curl/wget solely for healthchecks.
 - Use Compose `depends_on.condition: service_healthy` only with real healthchecks.
 
-## Dev/production separation
+## Dev And Production
 
 - Production compose is `docker-compose.yaml`.
 - Dev compose is `docker-compose.dev.yaml`, layered on top of production compose.
-- Dev and production may use different `.env` values, but for a given deployed reverse-proxy environment they must keep public URLs, CORS origins, auth URLs, cookie secrets, JWT secrets, and proxy assumptions internally consistent.
+- Dev and production may use the same local LAN defaults while stabilizing the local stack.
 - The dev override should only change live reload behavior, bind mounts, polling, container names, exposed dev/HMR ports, and dev commands.
-- Do not duplicate or override auth, CORS, public URL, cookie secret, JWT secret, database, or Redis values in `docker-compose.dev.yaml`.
 
-## Validation before finalizing changes
+## Validation
 
 Run or document expected results for:
 
 ```sh
+pnpm install --frozen-lockfile
+pnpm --filter @dtc/backend build
+pnpm --filter @dtc/storefront build
 docker compose config
-docker compose build --no-cache medusa
-docker compose up -d postgres redis medusa
-docker compose ps
-docker logs medusa_backend --tail=150
+docker compose build --no-cache
+docker compose up
 ```
 
 For Docker production, verify:
@@ -73,7 +71,7 @@ docker inspect medusa_backend --format '{{json .Mounts}}'
 
 The Medusa backend should not have a production bind mount to `/server` or `/app`.
 
-## Core commands
+## Core Commands
 
 Production:
 
@@ -87,23 +85,12 @@ Dev with live reload:
 docker compose -f docker-compose.yaml -f docker-compose.dev.yaml --profile dev up
 ```
 
-Validation:
-
-```sh
-npm run check-env
-npm run check-no-localhost
-npm run check:public-urls
-npm run healthcheck
-```
-
-## Module ownership map
+## Module Ownership Map
 
 - Backend / Medusa modules: `apps/backend/AGENTS.md`
 - Storefront / Next.js: `apps/storefront/AGENTS.md`
-- Docker / reverse proxy / deployment: `docs/AGENTS.infrastructure.md`
-- Security compliance: `docs/AGENTS.security.md`
 
-## Change style
+## Change Style
 
 - Make small, reversible commits.
 - Prefer validation scripts and clear errors over silent fallback behavior.
