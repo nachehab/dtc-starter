@@ -1,12 +1,34 @@
-# Backend Agent Guide
+# Backend AGENTS.md — Medusa Runtime and Module Compliance
 
-Scope: `apps/backend`, the Medusa v2 backend and admin runtime.
+Scope: `apps/backend`, the Medusa v2 backend, Admin runtime, custom modules, providers, routes, subscribers, jobs, migrations, and backend scripts.
 
-Read `README.md`, `../../README.md`, and `../../AGENTS.md` before changing backend, Docker, env, auth, payment, email, or upload behavior.
+Read `../../AGENTS.md`, `../../README.md`, and Medusa v2 documentation before changing backend architecture, module registration, Docker runtime behavior, auth, payment, notification, file, cache, event bus, workflow, or locking behavior.
 
-## Backend Env Reference
+## Security baseline
 
-Backend env belongs in `apps/backend/.env`. Use `apps/backend/.env.example`, `.env.template`, `.env.development.template`, or `.env.production.template` as references, then fill real values locally. Do not commit real secrets.
+- Never commit real `apps/backend/.env` values or secrets.
+- Never log `JWT_SECRET`, `COOKIE_SECRET`, SMTP credentials, PayPal secrets, bearer tokens, session cookies, reset tokens, or webhook signatures.
+- Diagnostics may report whether a required env exists, but must not print secret values.
+- Keep backend-only secrets out of storefront code, `NEXT_PUBLIC_*`, `VITE_PUBLIC_*`, and browser bundles.
+- Do not weaken CORS, auth, secure cookies, or token validation to fix local development friction.
+- Do not patch `node_modules`, generated `.medusa` output, or Medusa internals as a permanent fix.
+
+## Required Medusa conventions
+
+- Use package scripts for Medusa commands:
+  - `pnpm --filter @dtc/backend build` -> `medusa build`
+  - `pnpm --filter @dtc/backend start` -> `medusa start`
+  - `pnpm --filter @dtc/backend dev` -> `medusa develop`
+  - `pnpm --filter @dtc/backend predeploy` -> `medusa db:migrate`
+  - `pnpm --filter @dtc/backend seed` -> `medusa exec ./src/migration-scripts/initial-data-seed.ts`
+- Register modules/providers through `medusa-config.ts` using documented Medusa module provider shapes.
+- Keep module options env-driven. No hardcoded public origins, private origins, credentials, or fallback secrets.
+- Do not introduce custom Admin output paths, symlinks, or `.medusa` copy workarounds unless documented by Medusa for the pinned version and explained in code comments.
+- Do not disable Admin in production unless deployment intentionally separates Admin from server runtime and the README explains the topology.
+
+## Backend env reference
+
+Backend env belongs in `apps/backend/.env`. Templates may live beside it. Real values must stay local.
 
 Public backend/admin origins:
 
@@ -15,7 +37,7 @@ Public backend/admin origins:
 - `MEDUSA_ADMIN_BACKEND_URL`
 - `PUBLIC_ASSET_BASE_URL`
 
-Server-to-server/internal URL:
+Server/internal URL:
 
 - `INTERNAL_MEDUSA_URL`
 
@@ -34,7 +56,15 @@ CORS and auth:
 - `JWT_SECRET`
 - `COOKIE_SECRET`
 
-Admin Vite/HMR:
+Operational:
+
+- `DISABLE_MEDUSA_ADMIN`
+- `MEDUSA_WORKER_MODE`
+- `PORT`
+- `MEDUSA_ADMIN_ONBOARDING_TYPE`
+- `SEED_IMAGE_BASE_URL`
+
+Admin Vite/HMR, dev only unless documented otherwise:
 
 - `VITE_HOST`
 - `VITE_ORIGIN`
@@ -48,18 +78,10 @@ Admin Vite/HMR:
 - `VITE_HMR_CLIENT_PORT`
 - `VITE_DEV_PORT`
 
-PayPal:
-
-- `PAYPAL_CLIENT_ID`
-- `PAYPAL_CLIENT_SECRET`
-- `PAYPAL_WEBHOOK_ID`
-- `PAYPAL_API_BASE_URL`
-- `PAYPAL_ENVIRONMENT`
-- `PAYPAL_AUTO_CAPTURE`
-
 Email:
 
 - `EMAIL_PROVIDER`
+- `EMAIL_ENABLED`
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_SECURE`
@@ -69,128 +91,160 @@ Email:
 - `SITE_PUBLIC_URL`
 - `ADMIN_PUBLIC_URL`
 - `CONTACT_TO_EMAIL`
-- `EMAIL_ENABLED`
 
-Other:
+PayPal:
 
-- `DB_NAME`
-- `MEDUSA_ADMIN_ONBOARDING_TYPE`
-- `DISABLE_MEDUSA_ADMIN`
-- `MEDUSA_WORKER_MODE`
-- `PORT`
-- `SEED_IMAGE_BASE_URL`
+- `PAYPAL_CLIENT_ID`
+- `PAYPAL_CLIENT_SECRET`
+- `PAYPAL_WEBHOOK_ID`
+- `PAYPAL_API_BASE_URL`
+- `PAYPAL_ENVIRONMENT`
+- `PAYPAL_AUTO_CAPTURE`
 
-## Medusa Config Rules
+## Module agents
 
-- Keep `medusa-config.ts` as the source of backend runtime validation.
-- `PUBLIC_BACKEND_URL`, `MEDUSA_BACKEND_URL`, and `MEDUSA_ADMIN_BACKEND_URL` must resolve to the same public HTTPS backend/admin origin for deployed Docker use.
-- The local file provider must derive `backend_url` from `PUBLIC_BACKEND_URL` and append `/static`.
-- Do not hardcode local origins, Docker service names, LAN IPs, loopback hosts, or fallback browser origins.
-- Docker service names such as `postgres`, `redis`, and `medusa` are server/container-only.
-- Preserve Redis-backed caching, event bus, workflow engine, and locking unless the architecture intentionally changes.
-- Preserve the Vite HMR public host, `wss`, and client port `443` behavior behind the reverse proxy.
+### Config validation agent
 
-## Email Setup Rules
+Responsibilities:
 
-- Gmail SMTP is enabled only when backend env is configured for it.
-- Confirm `EMAIL_PROVIDER=gmail` before debugging Gmail behavior.
-- Confirm `EMAIL_ENABLED=true` when expecting real SMTP delivery.
-- Confirm `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, and `SMTP_FROM` are present.
-- Confirm `SITE_PUBLIC_URL` and `ADMIN_PUBLIC_URL` are public HTTPS origins.
-- Confirm `nodemailer` is in `dependencies` and `@types/nodemailer` is in `devDependencies`.
-- Never print `SMTP_PASS` or full SMTP auth objects.
-- Prefer sanitized diagnostics: print whether a setting is present, not its secret value.
+- Keep `medusa-config.ts` as the backend runtime validation gate.
+- Validate required envs early and fail clearly.
+- `PUBLIC_BACKEND_URL`, `MEDUSA_BACKEND_URL`, and `MEDUSA_ADMIN_BACKEND_URL` should be public HTTPS origins for deployed Docker use.
+- Docker service names may appear only in server-only envs such as `DATABASE_URL`, `REDIS_URL`, and internal URLs.
+- Do not permit browser-facing values to use localhost, loopback, LAN IPs, Docker service names, or random Vite ports.
 
-Safe command:
+### File module agent
+
+Responsibilities:
+
+- Use Medusa's file module/provider registration pattern.
+- For local file provider, keep `upload_dir` server-local and derive `backend_url` from the configured public backend/asset origin.
+- Uploaded asset URLs that reach the browser must use public HTTPS origins.
+- Do not save Docker service names, LAN IPs, or localhost URLs into product image records.
+
+### Notification/email module agent
+
+Responsibilities:
+
+- Use Medusa's notification module provider shape for email/feed providers.
+- Keep Gmail SMTP credentials in backend env only.
+- Keep `nodemailer` in backend `dependencies` if the provider imports it at runtime.
+- Missing optional email config may warn, but must not expose credential values.
+- Password reset, contact form, and transactional email links must use `SITE_PUBLIC_URL` or `ADMIN_PUBLIC_URL` public HTTPS origins.
+
+Safe test:
 
 ```sh
 pnpm --filter @dtc/backend email:test
 ```
 
-## PayPal Backend Rules
+### Payment/PayPal module agent
 
-- Keep backend PayPal secrets only in `apps/backend/.env`.
-- Required backend envs are `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`, `PAYPAL_API_BASE_URL`, `PAYPAL_ENVIRONMENT`, and `PAYPAL_AUTO_CAPTURE`.
-- Webhook URL must be based on the public backend origin:
+Responsibilities:
+
+- Use Medusa's payment provider registration pattern.
+- Backend PayPal secrets stay in backend env only.
+- Browser PayPal client ID may be exposed only through documented storefront public env.
+- Webhook signature validation must use `PAYPAL_WEBHOOK_ID` and the configured PayPal API origin.
+- Webhook URL format:
 
 ```text
 {PUBLIC_BACKEND_URL}/hooks/payment/paypal_paypal
 ```
 
-- Do not expose `PAYPAL_CLIENT_SECRET` or webhook credentials to the storefront.
-- Use explicit TypeScript types in PayPal modules and services.
-- Keep provider activation conditional on required backend credentials so local builds can run without real payment credentials.
+- Do not log PayPal secrets, authorization headers, webhook signatures, or raw payment credentials.
 
-## Cookie and Session Rules
+### Redis infrastructure module agent
 
-- Preserve secure cross-site admin cookie behavior:
+Responsibilities:
+
+- Keep caching, event bus, workflow engine, and locking Redis-backed in production unless architecture intentionally changes.
+- Use `REDIS_URL` fallbacks only for server-side module providers.
+- Do not expose Redis URLs to storefront/browser bundles.
+- If Redis is unavailable, fail readiness rather than silently degrading production consistency.
+
+### Admin/auth/cookie agent
+
+Responsibilities:
+
+- Preserve secure cookie settings:
 
 ```ts
 sameSite: "none"
 secure: true
 ```
 
-- Never rotate `COOKIE_SECRET` or `JWT_SECRET` casually. Changing either can invalidate sessions and tokens.
-- Admin login depends on HTTPS public origins, exact CORS/auth origins, stable secrets, and correct reverse proxy headers.
-- For login loops, verify the browser stores `connect.sid` for `ridersadmin.nchehab.ddns.net` with `Secure=true` and `SameSite=None`.
-- Add only sanitized debug logging. Never log secrets, full cookies, bearer tokens, or session contents.
+- Do not rotate `COOKIE_SECRET` or `JWT_SECRET` casually.
+- Login loops usually mean cookie/origin/proxy mismatch, not a reason to weaken auth.
+- Required reverse proxy headers:
 
-## Migration and Script Rules
+```nginx
+proxy_set_header Host $host;
+proxy_set_header X-Forwarded-Proto https;
+proxy_set_header X-Forwarded-Host $host;
+proxy_set_header X-Forwarded-Port 443;
+```
 
-- Keep migration scripts under `src/migration-scripts` and operational scripts under `src/scripts`.
-- Use Medusa commands through the package scripts when possible.
-- Run migrations with the backend env loaded for the intended Docker mode.
-- Make seed and fix scripts idempotent where practical.
-- Do not write scripts that rewrite public URLs to local or Docker-only origins.
-- If image URLs are wrong in the DB, use the root `fix-image-urls` workflow and public asset base URL.
+- Sanitized debug logs only. Never log full cookies, reset tokens, JWTs, sessions, or auth headers.
 
-## Safe Commands
+### Health/readiness agent
 
-From the repo root:
+Responsibilities:
+
+- `/health` should indicate the process is alive.
+- `/ready` should indicate required dependencies such as Postgres and Redis are reachable when implemented.
+- Docker healthchecks must be lightweight and not require extra shell tools when Node can do the job.
+- Compose readiness should wait on real healthchecks, not merely container start.
+
+## Safe commands
+
+From repo root:
 
 ```sh
 pnpm --filter @dtc/backend build
 pnpm --filter @dtc/backend email:test
 pnpm --filter @dtc/backend predeploy
 pnpm --filter @dtc/backend seed
-docker compose exec medusa printenv | sort
-```
-
-Before committing env or URL-related work:
-
-```sh
 npm run check-env
 npm run check-no-localhost
 npm run check:public-urls
 ```
 
-## Common Failure: Cannot Find Module `nodemailer`
-
-Checklist:
-
-- Confirm `apps/backend/package.json` has `nodemailer` in `dependencies`.
-- Confirm `@types/nodemailer` is available for TypeScript.
-- Confirm the lockfile was updated after dependency changes.
-- Rebuild the backend image after dependency or lockfile changes:
+Docker validation:
 
 ```sh
+docker compose config
 docker compose build --no-cache medusa
-docker compose up -d medusa
+docker compose up -d postgres redis medusa
+docker compose ps
+docker logs medusa_backend --tail=150
+docker exec -it medusa_backend sh -lc 'pwd && node -p "process.cwd()" && ls -la .medusa/server/public/admin/index.html'
 ```
 
-## Common Failure: Admin Login Loop
+## Common failures
 
-Likely causes:
+### Admin bundle exists but Medusa cannot find it
 
-- Missing or changed `COOKIE_SECRET` or `JWT_SECRET`.
-- Cookie not set with `Secure=true` and `SameSite=None`.
-- Backend env uses a non-public origin for `PUBLIC_BACKEND_URL`, `MEDUSA_BACKEND_URL`, `MEDUSA_ADMIN_BACKEND_URL`, `STORE_CORS`, `ADMIN_CORS`, or `AUTH_CORS`.
-- Reverse proxy does not forward `Host`, `X-Forwarded-Proto=https`, `X-Forwarded-Host`, and `X-Forwarded-Port=443`.
-- Browser-facing admin traffic is routed to a random Vite/HMR port instead of backend/admin.
-
-First checks:
+Check runtime root alignment before adding workarounds:
 
 ```sh
-docker compose exec medusa printenv | grep -E "PUBLIC_BACKEND_URL|MEDUSA_BACKEND_URL|MEDUSA_ADMIN_BACKEND_URL|STORE_CORS|ADMIN_CORS|AUTH_CORS|COOKIE_SECRET|JWT_SECRET"
-docker logs medusa_backend
+docker exec -it medusa_backend sh -lc 'pwd && node -p "process.cwd()" && find .medusa -name index.html -print'
 ```
+
+The production backend image should run from the isolated Medusa app root where `.medusa/server/public/admin/index.html` exists.
+
+### Cannot find module `nodemailer`
+
+- Confirm `nodemailer` is in backend `dependencies`.
+- Confirm lockfile was updated.
+- Rebuild backend image after dependency changes.
+
+### Admin login loop
+
+Check:
+
+- Stable `COOKIE_SECRET` and `JWT_SECRET`.
+- Exact public HTTPS `STORE_CORS`, `ADMIN_CORS`, and `AUTH_CORS`.
+- Public HTTPS backend/admin URLs.
+- Reverse proxy forwarded HTTPS headers.
+- Browser has `connect.sid` with `Secure=true` and `SameSite=None`.
