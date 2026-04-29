@@ -1,102 +1,92 @@
-# Infrastructure and Docker Agent Guide
+# Infrastructure AGENTS.md — Docker, Compose, Reverse Proxy, and Operations
 
-Scope: root Docker files, reverse proxy assumptions, environment separation, and validation workflows.
+Scope: root Docker files, Docker Compose, local/prod runtime topology, reverse proxy assumptions, healthchecks, readiness, public URL routing, and operational validation.
 
-There is no `infra` or `docker` directory in this repo, so this file is the scoped infrastructure guide. Read `../README.md` and `../AGENTS.md` before changing compose, Dockerfile, or proxy-sensitive behavior.
+Read `../AGENTS.md`, `../README.md`, `../apps/backend/AGENTS.md`, and `../apps/storefront/AGENTS.md` before changing infrastructure behavior.
 
-## Compose Files
+## Security baseline
 
-- `docker-compose.yaml` is production/stable.
-- `docker-compose.dev.yaml` is a development override for live reload.
-- Production command:
+- Do not commit real `.env` files, proxy certificates, private keys, API secrets, app passwords, database dumps, or production logs with credentials.
+- Do not print secrets in Docker logs, validation output, docs, comments, or issue bodies.
+- Compose should reference app-scoped env files; do not inline production secrets directly into `docker-compose.yaml`.
+- Browser-facing values must be public HTTPS origins. Docker service names are internal only.
 
-```sh
-docker compose up -d --build
+## Production Compose rules
+
+Production compose is `docker-compose.yaml`.
+
+Required behavior:
+
+- Uses built images.
+- Does not bind-mount source into app containers.
+- Does not expose Vite/HMR ports.
+- Publishes only required service ports, currently backend `9000` and storefront `8000`.
+- Loads backend env from `apps/backend/.env`.
+- Loads storefront env from `apps/storefront/.env`.
+- Uses BuildKit secrets for build-time app env files.
+- Uses `depends_on.condition: service_healthy` only where the dependency has a real healthcheck.
+- Keeps Postgres and Redis state in named volumes.
+
+Forbidden in production compose:
+
+```yaml
+volumes:
+  - .:/server
+  - .:/app
+ports:
+  - "5173:5173"
 ```
 
-- Dev/live reload command:
+## Development Compose rules
 
-```sh
-docker compose -f docker-compose.yaml -f docker-compose.dev.yaml --profile dev up
-```
+Development compose is `docker-compose.dev.yaml` and must remain an override.
 
-## Production Compose Rules
+Allowed only in dev:
 
-- Keep production compose production-oriented.
-- Production builds the backend from the root `Dockerfile`.
-- Production builds the storefront from `apps/storefront/Dockerfile`.
-- Production uses app-scoped env files:
-  - `apps/backend/.env`
-  - `apps/storefront/.env`
-- Production publishes only:
-  - `9000` for Medusa backend/admin
-  - `8000` for Next.js storefront
-- Do not publish random admin Vite ports in production.
-- Do not put secrets directly in compose files.
+- Source bind mounts.
+- Live reload commands such as `pnpm dev`.
+- Polling flags such as `CHOKIDAR_USEPOLLING` and `WATCHPACK_POLLING`.
+- Vite/HMR port exposure.
+- Dev-specific container names.
 
-## Dev Override Rules
+Dev override must not redefine real auth, CORS, secrets, database, Redis, or public URL values.
 
-`docker-compose.dev.yaml` may change only:
+## Dockerfile rules
 
-- Live reload commands.
-- Bind mounts.
-- Polling variables such as `CHOKIDAR_USEPOLLING` and `WATCHPACK_POLLING`.
-- Dev container names.
-- Dev build targets.
-- Dev-only HMR exposure, currently `5173`.
+Backend image:
 
-It must not override or duplicate:
+- Install dependencies with pnpm/Corepack.
+- Build backend/admin with `pnpm --filter @dtc/backend build`.
+- Validate `.medusa/server/public/admin/index.html` exists after build.
+- Runtime starts from the isolated Medusa app root.
+- Runtime does not depend on host `.medusa` or host `node_modules`.
+- Runtime includes only what it needs to start and healthcheck.
 
-- `PUBLIC_BACKEND_URL`
-- `MEDUSA_BACKEND_URL`
-- `MEDUSA_ADMIN_BACKEND_URL`
-- `STORE_CORS`
-- `ADMIN_CORS`
-- `AUTH_CORS`
-- `COOKIE_SECRET`
-- `JWT_SECRET`
-- `DATABASE_URL`
-- `REDIS_URL`
-- PayPal credentials
-- SMTP credentials
+Storefront image:
 
-Dev and production should share the same public URL, cookie, auth, CORS, and reverse proxy assumptions for the same deployed environment.
+- Builds only the storefront package.
+- Starts from the storefront app root.
+- Does not run Medusa backend commands.
 
-## BuildKit Secrets
+## Health and readiness
 
-Validate Docker BuildKit secrets stay wired as:
+- Postgres healthcheck should use `pg_isready`.
+- Redis healthcheck should use `redis-cli ping`.
+- Backend healthcheck should use Node-based HTTP probing against local backend health endpoint.
+- Storefront healthcheck should use Node-based HTTP probing against local Next.js endpoint.
+- `/health` should mean process is alive.
+- `/ready` should mean dependency readiness when implemented.
+- Do not install curl/wget only for healthchecks unless Node-based probing is impossible.
 
-- `backend_env` -> `./apps/backend/.env`
-- `storefront_env` -> `./apps/storefront/.env`
+## Reverse proxy rules
 
-Use BuildKit secrets for build-time env loading. Do not copy real `.env` files into images or commit them.
+Public routing:
 
-Validation:
+- Admin/backend public hostname routes to backend container port `9000`.
+- Storefront public hostname routes to storefront container port `8000`.
+- Dev HMR websocket routing is only for dev profile.
 
-```sh
-docker compose config
-docker compose build --no-cache
-```
-
-## Docker Networking
-
-- Backend to Postgres uses `postgres`.
-- Backend to Redis uses `redis`.
-- Reverse proxy to backend uses `medusa:9000`.
-- Reverse proxy to storefront uses `storefront:8000`.
-- Browser-facing env values use public HTTPS origins, not Docker service names.
-- `localhost`, `127.0.0.1`, LAN IPs, Docker service names, and random HMR ports must not appear in client-facing bundles.
-
-## Reverse Proxy / OPNsense Rules
-
-Validate HTTPS routing:
-
-```text
-ridersadmin.nchehab.ddns.net -> medusa:9000
-ridersparadise.nchehab.ddns.net -> storefront:8000
-```
-
-Required headers:
+Required HTTPS proxy headers:
 
 ```nginx
 proxy_set_header Host $host;
@@ -105,57 +95,46 @@ proxy_set_header X-Forwarded-Host $host;
 proxy_set_header X-Forwarded-Port 443;
 ```
 
-Dev HMR:
+Rules:
 
-- Websocket upgrades are needed only when using the dev profile.
-- Admin HMR should use the public host, `wss`, and client port `443`.
-- Public admin traffic should route to backend/admin, not a random Vite port.
+- Do not route production browser traffic to Vite random ports.
+- Do not expose firewall/admin UI through application subdomains.
+- Browser-facing app envs must match the hostnames users actually visit.
 
-## Production Validation
+## Validation commands
 
 ```sh
-docker compose down
+docker compose config
 docker compose build --no-cache
 docker compose up -d
-docker logs medusa_backend
-docker logs medusa_storefront
+docker compose ps
+docker logs medusa_backend --tail=150
+docker logs medusa_storefront --tail=150
 ```
 
-Then run:
+Backend runtime validation:
 
 ```sh
-npm run check-env
-npm run check-no-localhost
-npm run check:public-urls
+docker exec -it medusa_backend sh -lc 'pwd && node -p "process.cwd()" && ls -la .medusa/server/public/admin/index.html'
+docker inspect medusa_backend --format '{{json .Mounts}}'
 ```
 
-## Dev Validation
+Storefront runtime validation:
 
 ```sh
-docker compose -f docker-compose.yaml -f docker-compose.dev.yaml --profile dev up
+docker exec -it medusa_storefront sh -lc 'pwd && node -p "require(\"./package.json\").name"'
 ```
 
-Then confirm:
+## Common failure patterns
 
-- Backend/admin responds through the public backend/admin HTTPS origin.
-- Storefront responds through the public storefront HTTPS origin.
-- Admin HMR uses `wss` through the reverse proxy when dev profile is active.
-- No auth, CORS, secret, database, or Redis env values were duplicated in the dev override.
+### Admin bundle exists but Medusa cannot find it
 
-## Container Env Checks
+Check runtime root alignment before copying files around. The backend production container should run from the isolated Medusa app root where `.medusa/server/public/admin/index.html` exists.
 
-```sh
-docker compose exec medusa printenv | sort
-docker compose exec storefront printenv | sort
-```
+### Browser requests Docker service name
 
-When sharing output, redact secrets and credentials. For `COOKIE_SECRET`, `JWT_SECRET`, `SMTP_PASS`, `PAYPAL_CLIENT_SECRET`, and database credentials, report presence only.
+This means a public URL leak. Fix app env/config and rebuild browser bundles.
 
-## URL Leak Checks
+### Login loop behind HTTPS proxy
 
-```sh
-npm run check-no-localhost
-npm run check:public-urls
-```
-
-Run these after frontend/admin builds and before committing URL or env changes.
+Check cookie attributes, exact CORS/auth origins, stable secrets, and forwarded HTTPS headers before changing code.
