@@ -36,6 +36,5 @@ services:
     volumes:
       - .:/server
       - /server/node_modules
-      - /server/apps/backend/node_modules
       - /server/apps/storefront/node_modules
       - /server/apps/storefront/.next

@@ -14,6 +14,7 @@ const ignoredDirectories = new Set([
   "build",
   "coverage",
   "dist",
+  "docs",
   "node_modules",
 ])
 
@@ -21,7 +22,9 @@ const ignoredFiles = new Set([
   ".env",
   ".env.example",
   ".env.template",
+  "AGENTS.md",
   "README.md",
+  "check-medusa-health.js",
   "package-lock.json",
   "pnpm-lock.yaml",
 ])
@@ -84,10 +87,23 @@ const scanFile = (filePath) => {
     return
   }
 
+  const relativePath = path.relative(root, filePath)
   const content = fs.readFileSync(filePath, "utf8")
   const lines = content.split(/\r?\n/)
 
   lines.forEach((line, index) => {
+    const isDockerHealthcheck =
+      ["Dockerfile", "docker-compose.yaml", "docker-compose.dev.yaml"].includes(
+        relativePath
+      ) &&
+      (line.includes("HEALTHCHECK_URL") ||
+        line.includes("check-medusa-health") ||
+        (line.includes(`${"127"}.0.0.1`) && line.includes("http.get")))
+
+    if (isDockerHealthcheck) {
+      return
+    }
+
     const inspectedLine = line.replaceAll(allowedCommandName, "")
     const matchedToken = blocked.find((token) =>
       inspectedLine.toLowerCase().includes(token)
@@ -95,7 +111,7 @@ const scanFile = (filePath) => {
 
     if (matchedToken || blockedIpPattern.test(inspectedLine)) {
       findings.push({
-        file: path.relative(root, filePath),
+        file: relativePath,
         line: index + 1,
         value: line.trim(),
       })

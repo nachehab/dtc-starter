@@ -8,14 +8,14 @@ RUN corepack enable
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmrc ./
 COPY apps/backend/package.json ./apps/backend/package.json
-COPY apps/storefront/package.json ./apps/storefront/package.json
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --filter @dtc/backend...
 
 FROM deps AS builder
 
 WORKDIR /server
 
+COPY scripts/check-medusa-build-output.js ./scripts/check-medusa-build-output.js
 COPY . .
 
 ENV NODE_ENV=production
@@ -28,7 +28,7 @@ RUN --mount=type=secret,id=backend_env,target=/server/apps/backend/.env \
 
 FROM node:20-alpine AS runner
 
-WORKDIR /app
+WORKDIR /server/apps/backend
 
 RUN corepack enable
 
@@ -38,13 +38,13 @@ ENV DISABLE_MEDUSA_ADMIN=false
 ENV MEDUSA_WORKER_MODE=server
 ENV HEALTHCHECK_URL=http://127.0.0.1:9000/health
 
-COPY --from=builder /server/apps/backend ./
-COPY --from=builder /server/node_modules ./node_modules
-COPY --from=builder /server/scripts/check-medusa-health.js ./scripts/check-medusa-health.js
+COPY --from=builder /server/apps/backend /server/apps/backend
+COPY --from=builder /server/node_modules /server/node_modules
+COPY --from=builder /server/scripts/check-medusa-health.js /server/scripts/check-medusa-health.js
 
 EXPOSE 9000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
-  CMD node /app/scripts/check-medusa-health.js
+  CMD node /server/scripts/check-medusa-health.js
 
 CMD ["pnpm", "start"]
