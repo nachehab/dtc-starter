@@ -36,10 +36,15 @@ ENV NODE_ENV=production
 ENV PORT=9000
 ENV DISABLE_MEDUSA_ADMIN=false
 ENV MEDUSA_WORKER_MODE=server
+ENV HEALTHCHECK_URL=http://127.0.0.1:9000/health
 
 COPY --from=builder /server/apps/backend ./
 COPY --from=builder /server/node_modules ./node_modules
+COPY --from=builder /server/scripts/check-medusa-health.js ./scripts/check-medusa-health.js
 
 EXPOSE 9000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
+  CMD node /app/scripts/check-medusa-health.js
 
 CMD ["pnpm", "start"]
