@@ -12,9 +12,6 @@ COPY apps/storefront/package.json ./apps/storefront/package.json
 
 RUN pnpm install --frozen-lockfile
 
-# =========================
-# BUILD STAGE
-# =========================
 FROM deps AS builder
 
 WORKDIR /server
@@ -22,28 +19,26 @@ WORKDIR /server
 COPY . .
 
 ENV NODE_ENV=production
+ENV DISABLE_MEDUSA_ADMIN=false
+ENV MEDUSA_WORKER_MODE=server
 
-# ? CRITICAL FIX: build backend (admin UI gets generated here)
 RUN --mount=type=secret,id=backend_env,target=/server/apps/backend/.env \
-  pnpm --filter @dtc/backend build
+  pnpm --filter @dtc/backend build && \
+  node scripts/check-medusa-build-output.js
 
-# optional but recommended (keeps prod consistent)
-RUN --mount=type=secret,id=storefront_env,target=/server/apps/storefront/.env \
-  pnpm --filter @dtc/storefront build
-
-# =========================
-# RUNTIME
-# =========================
 FROM node:20-alpine AS runner
 
-WORKDIR /server/apps/backend
+WORKDIR /app
 
 RUN corepack enable
 
 ENV NODE_ENV=production
 ENV PORT=9000
+ENV DISABLE_MEDUSA_ADMIN=false
+ENV MEDUSA_WORKER_MODE=server
 
-COPY --from=builder /server /server
+COPY --from=builder /server/apps/backend ./
+COPY --from=builder /server/node_modules ./node_modules
 
 EXPOSE 9000
 
