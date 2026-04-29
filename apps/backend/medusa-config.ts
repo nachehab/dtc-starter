@@ -61,6 +61,22 @@ const isLocalOrPrivateUrl = (value: string) => {
   }
 };
 
+const isHttpsUrl = (value: string) => {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+const parseBooleanEnv = (value: string | undefined, fallback: boolean) => {
+  if (value === undefined || value === "") {
+    return fallback;
+  }
+
+  return ["1", "true", "yes", "on"].includes(value.toLowerCase());
+};
+
 const PUBLIC_URL = stripTrailingSlash(getRequiredEnv("PUBLIC_BACKEND_URL"));
 const MEDUSA_BACKEND_URL = stripTrailingSlash(
   getRequiredEnv("MEDUSA_BACKEND_URL"),
@@ -80,12 +96,24 @@ Object.entries(backendUrlAliases).forEach(([key, value]) => {
   }
 });
 
-if (
-  isLocalOrPrivateUrl(PUBLIC_URL) ||
-  isLocalOrPrivateUrl(MEDUSA_BACKEND_URL) ||
-  isLocalOrPrivateUrl(MEDUSA_ADMIN_BACKEND_URL)
-) {
-  throw new Error("Backend URLs must use public origins");
+if (!isDevelopment) {
+  if (
+    isLocalOrPrivateUrl(PUBLIC_URL) ||
+    isLocalOrPrivateUrl(MEDUSA_BACKEND_URL) ||
+    isLocalOrPrivateUrl(MEDUSA_ADMIN_BACKEND_URL)
+  ) {
+    throw new Error("Backend URLs must use public origins in production");
+  }
+}
+
+const cookieSecure = parseBooleanEnv(
+  process.env.COOKIE_SECURE,
+  isHttpsUrl(PUBLIC_URL),
+);
+const cookieSameSite = process.env.COOKIE_SAME_SITE || (cookieSecure ? "none" : "lax");
+
+if (cookieSameSite === "none" && !cookieSecure) {
+  throw new Error("COOKIE_SAME_SITE=none requires COOKIE_SECURE=true");
 }
 
 const parsePort = (value?: string) => {
@@ -411,8 +439,8 @@ module.exports = defineConfig({
       cookieSecret: process.env.COOKIE_SECRET!,
     },
     cookieOptions: {
-      sameSite: "none",
-      secure: true,
+      sameSite: cookieSameSite,
+      secure: cookieSecure,
     },
   },
   admin: {
