@@ -1,16 +1,19 @@
 import { HttpTypes } from "@medusajs/types"
 import { NextRequest, NextResponse } from "next/server"
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
+const BACKEND_URL =
+  process.env.MEDUSA_BACKEND_URL ||
+  process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
 const PUBLISHABLE_API_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
-const DEFAULT_REGION = process.env.NEXT_PUBLIC_DEFAULT_REGION || "dk"
+const DEFAULT_REGION = process.env.NEXT_PUBLIC_DEFAULT_REGION || "ca"
+const REGION_MAP_CACHE_TTL = 60 * 1000
 
 const regionMapCache = {
   regionMap: new Map<string, HttpTypes.StoreRegion>(),
   regionMapUpdated: Date.now(),
 }
 
-async function getRegionMap(cacheId: string) {
+async function getRegionMap() {
   const { regionMap, regionMapUpdated } = regionMapCache
 
   if (!BACKEND_URL) {
@@ -21,7 +24,7 @@ async function getRegionMap(cacheId: string) {
 
   if (
     !regionMap.keys().next().value ||
-    regionMapUpdated < Date.now() - 3600 * 1000
+    regionMapUpdated < Date.now() - REGION_MAP_CACHE_TTL
   ) {
     // Fetch regions from Medusa. We can't use the JS client here because middleware is running on Edge and the client needs a Node environment.
     const response = await fetch(`${BACKEND_URL}/store/regions`, {
@@ -29,11 +32,7 @@ async function getRegionMap(cacheId: string) {
       headers: {
         "x-publishable-api-key": PUBLISHABLE_API_KEY!,
       },
-      next: {
-        revalidate: 3600,
-        tags: [`regions-${cacheId}`],
-      },
-      cache: "force-cache",
+      cache: "no-store",
     })
 
     if (!response.ok) {
@@ -82,12 +81,19 @@ async function getCountryCode(
     .get("x-vercel-ip-country")
     ?.toLowerCase()
 
+  const localeCountryCode = getLocaleCountryCode(
+    request.headers.get("accept-language"),
+    regionMap
+  )
+
   if (urlCountryCode && regionMap.has(urlCountryCode)) {
     countryCode = urlCountryCode
   } else if (cloudflareCountryCode && regionMap.has(cloudflareCountryCode)) {
     countryCode = cloudflareCountryCode
   } else if (vercelCountryCode && regionMap.has(vercelCountryCode)) {
     countryCode = vercelCountryCode
+  } else if (localeCountryCode) {
+    countryCode = localeCountryCode
   } else if (regionMap.has(DEFAULT_REGION)) {
     countryCode = DEFAULT_REGION
   } else if (regionMap.keys().next().value) {
@@ -95,6 +101,24 @@ async function getCountryCode(
   }
 
   return countryCode
+}
+
+function getLocaleCountryCode(
+  acceptLanguage: string | null,
+  regionMap: Map<string, HttpTypes.StoreRegion | number>
+) {
+  if (!acceptLanguage) {
+    return
+  }
+
+  for (const language of acceptLanguage.split(",")) {
+    const locale = language.split(";")[0]?.trim().toLowerCase()
+    const countryCode = locale?.split("-")[1]
+
+    if (countryCode && regionMap.has(countryCode)) {
+      return countryCode
+    }
+  }
 }
 
 /**
@@ -108,7 +132,7 @@ export async function middleware(request: NextRequest) {
   const cacheIdCookie = request.cookies.get("_medusa_cache_id")
   const cacheId = cacheIdCookie?.value || crypto.randomUUID()
 
-  const regionMap = await getRegionMap(cacheId)
+  const regionMap = await getRegionMap()
   const countryCode = await getCountryCode(request, regionMap)
 
   // if the country code is available, use it, otherwise use the default region

@@ -19,6 +19,13 @@
 <p align="center">
   Building blocks for digital commerce
 </p>
+
+## Environment modes
+
+Use `.env.development.template` for Docker development and `.env.production.template` for Docker production. Copy the chosen template to `.env`, then fill in secrets and public origins for the mode you are running.
+
+Backend-only variables stay in this app. The backend uses Docker service names for Postgres and Redis, while browser-facing origins such as `PUBLIC_BACKEND_URL`, CORS values, and admin URLs must be public origins for the mode.
+
 <p align="center">
   <a href="https://github.com/medusajs/medusa/blob/master/CONTRIBUTING.md">
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat" alt="PRs welcome!" />

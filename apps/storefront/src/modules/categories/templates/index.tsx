@@ -37,18 +37,25 @@ export default function CategoryTemplate({
   getParents(category)
 
   return (
-    <div
-      className="flex flex-col small:flex-row small:items-start py-6 content-container"
-      data-testid="category-container"
-    >
+    <div className="content-container py-8 small:py-12" data-testid="category-container">
+      <div className="mb-8 rounded-[28px] border border-white/10 bg-[rgba(10,23,34,0.86)] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.38)] backdrop-blur-[18px] small:p-8">
+        <span className="rp-pill mb-4">Rider category</span>
+        <h1 className="rp-heading text-5xl font-bold uppercase leading-none text-white" data-testid="category-page-title">
+          {category.name}
+        </h1>
+        {category.description && (
+          <p className="mt-4 max-w-2xl text-[#b7c0b3]">{category.description}</p>
+        )}
+      </div>
+      <div className="flex flex-col gap-8 small:flex-row small:items-start">
       <RefinementList sortBy={sort} data-testid="sort-by-container" />
       <div className="w-full">
-        <div className="flex flex-row mb-8 text-2xl-semi gap-4">
+        <div className="flex flex-row mb-8 text-2xl-semi gap-4 text-[#b7c0b3]">
           {parents &&
             parents.map((parent) => (
               <span key={parent.id} className="text-ui-fg-subtle">
                 <LocalizedClientLink
-                  className="mr-4 hover:text-black"
+                  className="mr-4 hover:text-[#c6ff5e]"
                   href={`/categories/${parent.handle}`}
                   data-testid="sort-by-link"
                 >
@@ -57,13 +64,8 @@ export default function CategoryTemplate({
                 /
               </span>
             ))}
-          <h1 data-testid="category-page-title">{category.name}</h1>
+          <h2 className="text-white">{category.name}</h2>
         </div>
-        {category.description && (
-          <div className="mb-8 text-base-regular">
-            <p>{category.description}</p>
-          </div>
-        )}
         {category.category_children && (
           <div className="mb-8 text-base-large">
             <ul className="grid grid-cols-1 gap-2">
@@ -91,6 +93,7 @@ export default function CategoryTemplate({
             countryCode={countryCode}
           />
         </Suspense>
+      </div>
       </div>
     </div>
   )

@@ -1,0 +1,41 @@
+# Development override: live reload only.
+# Auth, CORS, cookie secrets, and public URL settings must stay in the shared
+# app env files and must not be overridden here.
+services:
+  medusa:
+    profiles:
+      - dev
+    build:
+      target: deps
+    container_name: medusa_backend_dev
+    environment:
+      NODE_ENV: development
+      PORT: 9000
+      CHOKIDAR_USEPOLLING: "true"
+    working_dir: /server/apps/backend
+    command: pnpm dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/server
+      - /server/node_modules
+      - /server/apps/backend/node_modules
+
+  storefront:
+    profiles:
+      - dev
+    build:
+      target: deps
+    container_name: medusa_storefront_dev
+    environment:
+      NODE_ENV: development
+      PORT: 8000
+      WATCHPACK_POLLING: "true"
+    working_dir: /server/apps/storefront
+    command: pnpm dev
+    volumes:
+      - .:/server
+      - /server/node_modules
+      - /server/apps/backend/node_modules
+      - /server/apps/storefront/node_modules
+      - /server/apps/storefront/.next

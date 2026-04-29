@@ -14,7 +14,7 @@ import { Locale } from "@lib/data/locales"
 
 const SideMenuItems = {
   Home: "/",
-  Store: "/store",
+  Shop: "/store",
   Account: "/account",
   Cart: "/cart",
 }
@@ -38,9 +38,11 @@ const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
               <div className="relative flex h-full">
                 <Popover.Button
                   data-testid="nav-menu-button"
-                  className="relative h-full flex items-center transition-all ease-out duration-200 focus:outline-none hover:text-ui-fg-base"
+                  className="relative h-full flex items-center transition-all ease-out duration-200 focus:outline-none hover:text-white"
                 >
-                  Menu
+                  <span className="rounded-full border border-white/10 bg-white/5 px-4 py-3 text-white">
+                    Menu
+                  </span>
                 </Popover.Button>
               </div>
 
@@ -65,7 +67,7 @@ const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
                 <PopoverPanel className="flex flex-col absolute w-full pr-4 sm:pr-0 sm:w-1/3 2xl:w-1/4 sm:min-w-min h-[calc(100vh-1rem)] z-[51] inset-x-0 text-sm text-ui-fg-on-color m-2 backdrop-blur-2xl">
                   <div
                     data-testid="nav-menu-popup"
-                    className="flex flex-col h-full bg-[rgba(3,7,18,0.5)] rounded-rounded justify-between p-6"
+                    className="flex flex-col h-full bg-[rgba(6,16,24,0.96)] border border-white/10 rounded-[28px] justify-between p-6 shadow-[0_24px_80px_rgba(0,0,0,0.38)]"
                   >
                     <div className="flex justify-end" id="xmark">
                       <button data-testid="close-menu-button" onClick={close}>
@@ -78,7 +80,7 @@ const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
                           <li key={name}>
                             <LocalizedClientLink
                               href={href}
-                              className="text-3xl leading-10 hover:text-ui-fg-disabled"
+                              className="rp-heading text-4xl font-bold leading-10 text-white hover:text-[#c6ff5e]"
                               onClick={close}
                               data-testid={`${name.toLowerCase()}-link`}
                             >
@@ -127,7 +129,7 @@ const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
                         />
                       </div>
                       <Text className="flex justify-between txt-compact-small">
-                        © {new Date().getFullYear()} Medusa Store. All rights
+                        © {new Date().getFullYear()} Riders Paradise. All rights
                         reserved.
                       </Text>
                     </div>
@@ -143,3 +145,4 @@ const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
 }
 
 export default SideMenu
+

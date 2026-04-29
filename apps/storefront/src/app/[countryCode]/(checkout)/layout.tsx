@@ -1,6 +1,6 @@
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import ChevronDown from "@modules/common/icons/chevron-down"
-import MedusaCTA from "@modules/layout/components/medusa-cta"
+import Image from "next/image"
 
 export default function CheckoutLayout({
   children,
@@ -8,12 +8,12 @@ export default function CheckoutLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="w-full bg-white relative small:min-h-screen">
-      <div className="h-16 bg-white border-b ">
+    <div className="w-full relative small:min-h-screen">
+      <div className="h-20 border-b border-white/10 bg-[#061018]/85 backdrop-blur-[18px]">
         <nav className="flex h-full items-center content-container justify-between">
           <LocalizedClientLink
             href="/cart"
-            className="text-small-semi text-ui-fg-base flex items-center gap-x-2 uppercase flex-1 basis-0"
+            className="text-small-semi text-[#b7c0b3] flex items-center gap-x-2 uppercase flex-1 basis-0 hover:text-white"
             data-testid="back-to-cart-link"
           >
             <ChevronDown className="rotate-90" size={16} />
@@ -26,17 +26,26 @@ export default function CheckoutLayout({
           </LocalizedClientLink>
           <LocalizedClientLink
             href="/"
-            className="txt-compact-xlarge-plus text-ui-fg-subtle hover:text-ui-fg-base uppercase"
+            className="flex items-center gap-3 text-white hover:text-[#c6ff5e]"
             data-testid="store-link"
           >
-            Medusa Store
+            <Image
+              src="/riders-paradise-logo.png"
+              alt="Riders Paradise"
+              width={92}
+              height={72}
+              className="h-14 w-[72px] rounded-[10px] bg-white p-1 object-contain"
+            />
+            <span className="rp-heading hidden text-2xl font-bold uppercase small:block">
+              Riders Paradise
+            </span>
           </LocalizedClientLink>
           <div className="flex-1 basis-0" />
         </nav>
       </div>
       <div className="relative" data-testid="checkout-container">{children}</div>
-      <div className="py-4 w-full flex items-center justify-center">
-        <MedusaCTA />
+      <div className="py-4 w-full flex items-center justify-center text-[#b7c0b3]">
+        Ride harder. Gear smarter.
       </div>
     </div>
   )

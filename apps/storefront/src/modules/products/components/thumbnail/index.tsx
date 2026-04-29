@@ -1,4 +1,5 @@
 import { Container, clx } from "@modules/common/components/ui"
+import { getPublicAssetUrl } from "@lib/util/public-asset-url"
 import Image from "next/image"
 import React from "react"
 
@@ -17,26 +18,24 @@ const Thumbnail: React.FC<ThumbnailProps> = ({
   thumbnail,
   images,
   size = "small",
-  isFeatured,
   className,
   "data-testid": dataTestid,
 }) => {
-  const initialImage = thumbnail || images?.[0]?.url
+  const initialImage = getPublicAssetUrl(thumbnail || images?.[0]?.url)
 
   return (
     <Container
       className={clx(
-        "relative w-full overflow-hidden p-4 bg-ui-bg-subtle shadow-elevation-card-rest rounded-large group-hover:shadow-elevation-card-hover transition-shadow ease-in-out duration-150",
+        "relative w-full overflow-hidden bg-white/[0.04] border border-white/10 rounded-[20px] group-hover:border-[#c6ff5e]/30 transition-shadow ease-in-out duration-150",
         className,
         {
-          "aspect-[11/14]": isFeatured,
-          "aspect-[9/16]": !isFeatured && size !== "square",
+          "aspect-[4/3]": size !== "square",
           "aspect-[1/1]": size === "square",
           "w-[180px]": size === "small",
           "w-[290px]": size === "medium",
           "w-[440px]": size === "large",
           "w-full": size === "full",
-        }
+        },
       )}
       data-testid={dataTestid}
     >
@@ -48,7 +47,7 @@ const Thumbnail: React.FC<ThumbnailProps> = ({
 const ImageOrPlaceholder = ({
   image,
   size,
-}: Pick<ThumbnailProps, "size"> & { image?: string }) => {
+}: Pick<ThumbnailProps, "size"> & { image?: string | null }) => {
   return image ? (
     <Image
       src={image}

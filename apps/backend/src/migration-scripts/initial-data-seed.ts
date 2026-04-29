@@ -7,14 +7,12 @@ import {
 } from "@medusajs/framework/utils";
 import {
   createApiKeysWorkflow,
-  createCollectionsWorkflow,
   createInventoryLevelsWorkflow,
   createProductCategoriesWorkflow,
   createProductsWorkflow,
   createRegionsWorkflow,
   createSalesChannelsWorkflow,
   createShippingOptionsWorkflow,
-  createShippingProfilesWorkflow,
   createStockLocationsWorkflow,
   createStoresWorkflow,
   createTaxRegionsWorkflow,
@@ -31,8 +29,16 @@ export default async function initial_data_seed({
   const link = container.resolve(ContainerRegistrationKeys.LINK);
   const query = container.resolve(ContainerRegistrationKeys.QUERY);
   const fulfillmentModuleService = container.resolve(
-    ModuleRegistrationName.FULFILLMENT
+    ModuleRegistrationName.FULFILLMENT,
   );
+  const seedImageBaseUrl = process.env.SEED_IMAGE_BASE_URL?.replace(/\/+$/, "");
+
+  if (!seedImageBaseUrl) {
+    throw new Error("SEED_IMAGE_BASE_URL is required to seed product images");
+  }
+
+  const getSeedImageUrl = (fileName: string) =>
+    `${seedImageBaseUrl}/${fileName}`;
 
   const countries = ["gb", "de", "dk", "se", "fr", "es", "it"];
 
@@ -71,9 +77,7 @@ export default async function initial_data_seed({
     },
   });
 
-  const {
-    result: [store],
-  } = await createStoresWorkflow(container).run({
+  await createStoresWorkflow(container).run({
     input: {
       stores: [
         {
@@ -121,7 +125,7 @@ export default async function initial_data_seed({
 
   logger.info("Seeding stock location data...");
   const { result: stockLocationResult } = await createStockLocationsWorkflow(
-    container
+    container,
   ).run({
     input: {
       locations: [
@@ -297,7 +301,7 @@ export default async function initial_data_seed({
   logger.info("Seeding product data...");
 
   const { result: categoryResult } = await createProductCategoriesWorkflow(
-    container
+    container,
   ).run({
     input: {
       product_categories: [
@@ -337,16 +341,16 @@ export default async function initial_data_seed({
           shipping_profile_id: shippingProfile.id,
           images: [
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-black-front.png",
+              url: getSeedImageUrl("tee-black-front.png"),
             },
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-black-back.png",
+              url: getSeedImageUrl("tee-black-back.png"),
             },
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-white-front.png",
+              url: getSeedImageUrl("tee-white-front.png"),
             },
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/tee-white-back.png",
+              url: getSeedImageUrl("tee-white-back.png"),
             },
           ],
           options: [
@@ -524,10 +528,10 @@ export default async function initial_data_seed({
           shipping_profile_id: shippingProfile.id,
           images: [
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatshirt-vintage-front.png",
+              url: getSeedImageUrl("sweatshirt-vintage-front.png"),
             },
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatshirt-vintage-back.png",
+              url: getSeedImageUrl("sweatshirt-vintage-back.png"),
             },
           ],
           options: [
@@ -625,10 +629,10 @@ export default async function initial_data_seed({
           shipping_profile_id: shippingProfile.id,
           images: [
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatpants-gray-front.png",
+              url: getSeedImageUrl("sweatpants-gray-front.png"),
             },
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatpants-gray-back.png",
+              url: getSeedImageUrl("sweatpants-gray-back.png"),
             },
           ],
           options: [
@@ -726,10 +730,10 @@ export default async function initial_data_seed({
           shipping_profile_id: shippingProfile.id,
           images: [
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/shorts-vintage-front.png",
+              url: getSeedImageUrl("shorts-vintage-front.png"),
             },
             {
-              url: "https://medusa-public-images.s3.eu-west-1.amazonaws.com/shorts-vintage-back.png",
+              url: getSeedImageUrl("shorts-vintage-back.png"),
             },
           ],
           options: [

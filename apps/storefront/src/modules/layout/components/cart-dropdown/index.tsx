@@ -82,7 +82,7 @@ const CartDropdown = ({
       <Popover className="relative h-full">
         <PopoverButton className="h-full">
           <LocalizedClientLink
-            className="hover:text-ui-fg-base"
+            className="rounded-full border border-white/10 bg-white/5 px-4 py-3 text-white hover:text-[#c6ff5e]"
             href="/cart"
             data-testid="nav-cart-link"
           >{`Cart (${totalItems})`}</LocalizedClientLink>
@@ -99,7 +99,7 @@ const CartDropdown = ({
         >
           <PopoverPanel
             static
-            className="hidden small:block absolute top-[calc(100%+1px)] right-0 bg-white border-x border-b border-gray-200 w-[420px] text-ui-fg-base"
+            className="hidden small:block absolute top-[calc(100%+10px)] right-0 rounded-[24px] border border-white/10 bg-[rgba(6,16,24,0.96)] w-[420px] text-white shadow-[0_24px_80px_rgba(0,0,0,0.38)] backdrop-blur-[18px]"
             data-testid="nav-cart-dropdown"
           >
             <div className="p-4 flex items-center justify-center">
@@ -205,10 +205,10 @@ const CartDropdown = ({
             ) : (
               <div>
                 <div className="flex py-16 flex-col gap-y-4 items-center justify-center">
-                  <div className="bg-gray-900 text-small-regular flex items-center justify-center w-6 h-6 rounded-full text-white">
+                  <div className="bg-[#c6ff5e] text-small-regular flex items-center justify-center w-6 h-6 rounded-full text-[#07110c]">
                     <span>0</span>
                   </div>
-                  <span>Your shopping bag is empty.</span>
+                  <span>Your cart is ready for rider gear.</span>
                   <div>
                     <LocalizedClientLink href="/store">
                       <>
