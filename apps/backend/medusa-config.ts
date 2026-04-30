@@ -106,12 +106,21 @@ const parseCookieSameSite = (
   throw new Error("COOKIE_SAME_SITE must be one of: none, lax, strict");
 };
 
-const PUBLIC_URL = stripTrailingSlash(getRequiredEnv("PUBLIC_BACKEND_URL"));
-const MEDUSA_BACKEND_URL = stripTrailingSlash(
-  getRequiredEnv("MEDUSA_BACKEND_URL"),
-);
-const MEDUSA_ADMIN_BACKEND_URL = stripTrailingSlash(
-  getRequiredEnv("MEDUSA_ADMIN_BACKEND_URL"),
+const getRequiredOriginEnv = (key: string) => {
+  const value = getRequiredEnv(key);
+  const normalized = stripTrailingSlash(value);
+
+  if (value !== normalized) {
+    throw new Error(`${key} must not include a trailing slash`);
+  }
+
+  return value;
+};
+
+const PUBLIC_URL = getRequiredOriginEnv("PUBLIC_BACKEND_URL");
+const MEDUSA_BACKEND_URL = getRequiredOriginEnv("MEDUSA_BACKEND_URL");
+const MEDUSA_ADMIN_BACKEND_URL = getRequiredOriginEnv(
+  "MEDUSA_ADMIN_BACKEND_URL",
 );
 
 const backendUrlAliases = {
@@ -448,6 +457,12 @@ const modules = [
       ]
     : []),
 ];
+const plugins = [
+  {
+    resolve: "@medusajs/draft-order",
+    options: {},
+  },
+];
 
 [
   "STORE_CORS",
@@ -522,5 +537,6 @@ module.exports = defineConfig({
       };
     },
   },
+  plugins,
   modules,
 });

@@ -25,6 +25,15 @@ cp apps/backend/.env.development.template apps/backend/.env
 cp apps/storefront/.env.development.template apps/storefront/.env
 ```
 
+If the app env files are missing and you only need a quick bootstrap before filling in deployment values, create them from the examples first:
+
+```sh
+cp apps/backend/.env.example apps/backend/.env
+cp apps/storefront/.env.example apps/storefront/.env
+```
+
+Before running the Docker dev profile, make sure `apps/backend/.env` includes the Vite/HMR keys from `apps/backend/.env.development.template`, including `VITE_HOST`, `VITE_ORIGIN`, `VITE_ALLOWED_HOSTS`, `VITE_HMR_PROTOCOL`, `VITE_HMR_HOST`, `VITE_HMR_CLIENT_PORT`, and `VITE_DEV_PORT`.
+
 For Docker production:
 
 ```sh

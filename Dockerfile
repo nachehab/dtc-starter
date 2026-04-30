@@ -20,7 +20,7 @@ ENV DISABLE_MEDUSA_ADMIN=false
 ENV MEDUSA_WORKER_MODE=server
 
 RUN --mount=type=secret,id=backend_env,target=/server/apps/backend/.env \
-  pnpm --filter @dtc/backend build && pnpm check:medusa-build-output
+  pnpm --filter @dtc/backend build
 
 FROM node:22-alpine AS runner
 

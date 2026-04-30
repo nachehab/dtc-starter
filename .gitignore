@@ -15,6 +15,7 @@ node_modules
 
 # Testing
 coverage
+*.tsbuildinfo
 
 # Next.js
 **/.next/
