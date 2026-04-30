@@ -1,13 +1,5 @@
 # Storefront
 
-## Environment modes
+Use `.env.production.template` as the storefront env template when building storefront assets. `NEXT_PUBLIC_MEDUSA_BACKEND_URL` must be browser-reachable. `MEDUSA_BACKEND_URL` is server-only and should stay aligned with the public backend origin unless a production server-to-server route is intentionally configured.
 
-Use `.env.development.template` for Docker development and `.env.production.template` for Docker production. Copy the chosen template to `.env`, then fill in the publishable key and any payment provider keys.
-
-`NEXT_PUBLIC_MEDUSA_BACKEND_URL` must be browser-reachable. `MEDUSA_BACKEND_URL` is server-only and may use the Docker backend service name for server rendering and middleware.
-
-## Docker production builds
-
-Docker production builds currently ignore ESLint and TypeScript validation errors during `next build` so lint/type cleanup does not block deployment.
-
-Code cleanup should still be handled separately with focused fixes and normal local checks.
+The root `docker-compose.yaml` is production-only for the Medusa backend/admin service.

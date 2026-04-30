@@ -93,7 +93,7 @@ const scanFile = (filePath) => {
 
   lines.forEach((line, index) => {
     const isDockerHealthcheck =
-      ["Dockerfile", "docker-compose.yaml", "docker-compose.dev.yaml"].includes(
+      ["Dockerfile", "docker-compose.yaml"].includes(
         relativePath
       ) &&
       (line.includes("HEALTHCHECK_URL") ||

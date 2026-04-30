@@ -13,7 +13,6 @@
     "medusa"
   ],
   "scripts": {
-    "dev": "medusa develop --host 0.0.0.0",
     "build": "medusa build",
     "predeploy": "medusa db:migrate",
     "start": "medusa start",
@@ -59,7 +58,6 @@
     "react-dom": "^18.3.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.2",
-    "vite": "^5.4.14",
     "yalc": "^1.0.0-pre.53"
   },
   "engines": {

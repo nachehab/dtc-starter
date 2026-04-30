@@ -10,94 +10,31 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d medusa-store"]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 10s
-    networks:
-      - medusa_network
 
   redis:
     image: redis:7-alpine
     container_name: medusa_redis
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 5s
-    networks:
-      - medusa_network
 
   medusa:
     build:
       context: .
-      dockerfile: Dockerfile
-      secrets:
-        - backend_env
     container_name: medusa_backend
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-    working_dir: /server/apps/backend
+        condition: service_started
     ports:
       - "9000:9000"
-    environment:
-      NODE_ENV: production
-      PORT: 9000
     env_file:
       - apps/backend/.env
-    healthcheck:
-      test: ["CMD-SHELL", "node -e \"const http=require('http');const req=http.get('http://127.0.0.1:9000/health',res=>process.exit(res.statusCode<400?0:1));req.on('error',()=>process.exit(1));req.setTimeout(5000,()=>req.destroy());\""]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
-    networks:
-      - medusa_network
-
-  storefront:
-    build:
-      context: .
-      dockerfile: apps/storefront/Dockerfile
-      secrets:
-        - storefront_env
-    container_name: medusa_storefront
-    restart: unless-stopped
-    depends_on:
-      medusa:
-        condition: service_healthy
-    working_dir: /server/apps/storefront
-    ports:
-      - "8000:8000"
-    environment:
-      NODE_ENV: production
-      PORT: 8000
-    env_file:
-      - apps/storefront/.env
-    healthcheck:
-      test: ["CMD-SHELL", "node -e \"const http=require('http');const req=http.get('http://127.0.0.1:8000/',res=>process.exit(res.statusCode<500?0:1));req.on('error',()=>process.exit(1));req.setTimeout(5000,()=>req.destroy());\""]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
-    networks:
-      - medusa_network
+    working_dir: /server/apps/backend
 
 volumes:
   postgres_data:
-
-networks:
-  medusa_network:
-    driver: bridge
-
-secrets:
-  backend_env:
-    file: ./apps/backend/.env
-  storefront_env:
-    file: ./apps/storefront/.env

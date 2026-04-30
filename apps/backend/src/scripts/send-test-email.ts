@@ -3,7 +3,7 @@ import { loadEnv } from "@medusajs/framework/utils"
 import { sendEmail } from "../services/email/email-service"
 import { emailTemplates } from "../services/email/templates"
 
-loadEnv(process.env.NODE_ENV || "development", process.cwd())
+loadEnv(process.env.NODE_ENV || "production", process.cwd())
 
 async function main() {
   const to = process.env.EMAIL_TEST_TO || process.env.SMTP_USER

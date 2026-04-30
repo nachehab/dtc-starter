@@ -4,7 +4,6 @@ const path = require("path");
 const root = process.cwd();
 const httpPrefix = `${"http"}://`;
 const loopHostToken = `${"local"}${"host"}`;
-const blockedHmrPort = [":", "379", "63"].join("");
 
 const scanTargets = [
   "apps/backend/medusa-config.ts",
@@ -12,8 +11,6 @@ const scanTargets = [
   "apps/backend/.medusa/server/public/admin",
   "apps/storefront/next.config.js",
   "apps/storefront/src",
-  "apps/storefront/.next/static",
-  "apps/storefront/.next/server/app",
 ];
 
 const ignoredDirectories = new Set([".git", ".turbo", "cache", "node_modules"]);
@@ -38,10 +35,6 @@ const forbidden = [
   {
     label: "browser loopback URL",
     pattern: new RegExp(`${loopHostToken}(?::[0-9]+|/)`, "i"),
-  },
-  {
-    label: "random Vite HMR port",
-    pattern: new RegExp(`${blockedHmrPort}\\b`),
   },
   {
     label: "internal Medusa service URL",

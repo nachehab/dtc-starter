@@ -20,11 +20,11 @@
   Building blocks for digital commerce
 </p>
 
-## Environment modes
+## Production Environment
 
-Use `.env.development.template` for Docker development and `.env.production.template` for Docker production. Copy the chosen template to `.env`, then fill in secrets and public origins for the mode you are running.
+Use `.env.production.template` as the backend env template. Copy it to `.env`, then fill in secrets and public HTTPS origins.
 
-Backend-only variables stay in this app. The backend uses Docker service names for Postgres and Redis, while browser-facing origins such as `PUBLIC_BACKEND_URL`, CORS values, and admin URLs must be public origins for the mode.
+Backend-only variables stay in this app. The backend uses Docker service names for Postgres and Redis, while browser-facing origins such as `PUBLIC_BACKEND_URL`, CORS values, and admin URLs must be public production origins.
 
 <p align="center">
   <a href="https://github.com/medusajs/medusa/blob/master/CONTRIBUTING.md">

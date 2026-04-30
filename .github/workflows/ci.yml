@@ -96,14 +96,5 @@ jobs:
             echo "Production compose must not bind-mount /server"
             exit 1
           fi
-          if grep -q 'published: "5173"' /tmp/docker-compose-rendered.yaml; then
-            echo "Production compose must not expose Vite HMR port 5173"
-            exit 1
-          fi
-          if grep -q "NODE_ENV: development" /tmp/docker-compose-rendered.yaml; then
-            echo "Production compose must not run with NODE_ENV=development"
-            exit 1
-          fi
-
       - name: Build production Docker images
-        run: docker compose build --no-cache medusa storefront
+        run: docker compose build --no-cache medusa

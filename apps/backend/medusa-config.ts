@@ -2,27 +2,30 @@ import { loadEnv, defineConfig } from "@medusajs/framework/utils";
 
 type CookieSameSite = "none" | "lax" | "strict";
 
-type ViteAlias = {
-  find: string | RegExp;
-  replacement: string;
+loadEnv(process.env.NODE_ENV || "production", process.cwd());
+
+const isPackageBuild = process.env.npm_lifecycle_event === "build";
+const buildEnvFallbacks: Record<string, string> = {
+  PUBLIC_BACKEND_URL: "https://your-domain",
+  MEDUSA_BACKEND_URL: "https://your-domain",
+  MEDUSA_ADMIN_BACKEND_URL: "https://your-domain",
+  DATABASE_URL: "postgres://postgres:postgres@postgres:5432/medusa-store",
+  REDIS_URL: "redis://redis:6379",
+  STORE_CORS: "https://your-storefront-domain,https://your-domain",
+  ADMIN_CORS: "https://your-domain",
+  AUTH_CORS: "https://your-domain",
+  JWT_SECRET: "build-time-jwt-secret-not-used-at-runtime",
+  COOKIE_SECRET: "build-time-cookie-secret-not-used-at-runtime",
 };
-
-type ViteAliasOptions = ViteAlias[] | Record<string, string>;
-
-type VitePlugin = {
-  name: string;
-  enforce?: "pre" | "post";
-  transform?: (code: string, id: string) => string | null;
-};
-
-loadEnv(process.env.NODE_ENV || "development", process.cwd());
-
-const isDevelopment = process.env.NODE_ENV !== "production";
 
 const getRequiredEnv = (key: string) => {
   const value = process.env[key];
 
   if (!value) {
+    if (isPackageBuild && buildEnvFallbacks[key]) {
+      return buildEnvFallbacks[key];
+    }
+
     throw new Error(`${key} is not defined`);
   }
 
@@ -106,6 +109,15 @@ const parseCookieSameSite = (
   throw new Error("COOKIE_SAME_SITE must be one of: none, lax, strict");
 };
 
+const parsePort = (value?: string) => {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? undefined : parsed;
+};
+
 const getRequiredOriginEnv = (key: string) => {
   const value = getRequiredEnv(key);
   const normalized = stripTrailingSlash(value);
@@ -134,7 +146,7 @@ Object.entries(backendUrlAliases).forEach(([key, value]) => {
   }
 });
 
-if (!isDevelopment) {
+if (process.env.NODE_ENV === "production") {
   if (
     isLocalOrPrivateUrl(PUBLIC_URL) ||
     isLocalOrPrivateUrl(MEDUSA_BACKEND_URL) ||
@@ -159,42 +171,6 @@ if (cookieSameSite === "none" && !cookieSecure) {
   throw new Error("COOKIE_SAME_SITE=none requires COOKIE_SECURE=true");
 }
 
-const parsePort = (value?: string) => {
-  if (!value) {
-    return undefined;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  return Number.isNaN(parsed) ? undefined : parsed;
-};
-
-const parseRequiredDevelopmentPort = (key: string) => {
-  const value = getRequiredDevelopmentEnv(key);
-  const parsed = parsePort(value);
-
-  if (isDevelopment && parsed === undefined) {
-    throw new Error(`${key} must be a valid port`);
-  }
-
-  return parsed;
-};
-
-const parseViteHost = (value?: string) => {
-  if (!value) {
-    return undefined;
-  }
-
-  if (value === "true") {
-    return true;
-  }
-
-  if (value === "false") {
-    return false;
-  }
-
-  return value;
-};
-
 const parseEnvList = (value?: string) =>
   value
     ?.split(",")
@@ -203,14 +179,6 @@ const parseEnvList = (value?: string) =>
 
 const getEnvOrFallback = (key: string, fallbackKey: string) =>
   process.env[key] || getRequiredEnv(fallbackKey);
-
-const getRequiredDevelopmentEnv = (key: string) => {
-  if (!isDevelopment) {
-    return undefined;
-  }
-
-  return getRequiredEnv(key);
-};
 
 const hostnameFromUrl = (value?: string) => {
   if (!value) {
@@ -227,22 +195,15 @@ const hostnameFromUrl = (value?: string) => {
 const adminAllowedHosts = Array.from(
   new Set(
     [
-      hostnameFromUrl(process.env.VITE_PUBLIC_HOST),
-      hostnameFromUrl(process.env.VITE_PUBLIC_ADMIN_BASE_URL),
-      hostnameFromUrl(process.env.VITE_PUBLIC_BACKEND_URL),
-      hostnameFromUrl(process.env.VITE_PUBLIC_ASSET_BASE_URL),
       hostnameFromUrl(PUBLIC_URL),
       hostnameFromUrl(MEDUSA_ADMIN_BACKEND_URL),
       ...parseEnvList(process.env.MEDUSA_BACKEND_URL).map(hostnameFromUrl),
       ...parseEnvList(process.env.MEDUSA_ADMIN_BACKEND_URL).map(
         hostnameFromUrl,
       ),
-      ...parseEnvList(process.env.VITE_ORIGIN).map(hostnameFromUrl),
-      ...parseEnvList(process.env.VITE_ALLOWED_HOSTS).map(hostnameFromUrl),
       ...parseEnvList(process.env.__MEDUSA_ADMIN_ADDITIONAL_ALLOWED_HOSTS).map(
         hostnameFromUrl,
       ),
-      process.env.VITE_HMR_HOST,
     ].filter(Boolean) as string[],
   ),
 );
@@ -283,55 +244,6 @@ if (!isPaypalConfigured) {
     "[payments:paypal] PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET are not defined. PayPal payment provider is disabled.",
   );
 }
-
-const getAdminViteAliases = (
-  alias: ViteAliasOptions | undefined,
-): ViteAlias[] => {
-  const aliases = Array.isArray(alias)
-    ? alias
-    : Object.entries(alias ?? {}).map(([find, replacement]) => ({
-        find,
-        replacement: String(replacement),
-      }));
-
-  return [
-    {
-      find: /^zod$/,
-      replacement: "zod/v4",
-    },
-    ...aliases,
-  ];
-};
-
-const medusaDashboardRouterFutureFlagPlugin = (): VitePlugin => ({
-  name: "medusa-dashboard-router-future-flag",
-  enforce: "pre",
-  transform(code, id) {
-    if (
-      !id.includes("@medusajs/dashboard") ||
-      !code.includes("createBrowserRouter") ||
-      code.includes("v7_startTransition")
-    ) {
-      return null;
-    }
-
-    const nextCode = code
-      .replace(
-        /(\bcreateBrowserRouter\s*\(\s*routes\s*,\s*\{\s*basename:\s*__BASE__\s*\|\|\s*["']\/["']\s*)(,?\s*\})/g,
-        "$1,\n      future: { v7_startTransition: true }$2",
-      )
-      .replace(
-        /<RouterProvider\s+router=\{router\}\s*\/>/g,
-        "<RouterProvider router={router} future={{ v7_startTransition: true }} />",
-      )
-      .replace(
-        /(\bjsx\w*\s*\(\s*[^,]*RouterProvider\s*,\s*\{\s*router\s*)(\}\s*\))/g,
-        "$1, future: { v7_startTransition: true }$2",
-      );
-
-    return nextCode === code ? null : nextCode;
-  },
-});
 
 const modules = [
   {
@@ -494,48 +406,6 @@ module.exports = defineConfig({
   },
   admin: {
     backendUrl: MEDUSA_ADMIN_BACKEND_URL,
-    vite: (config) => {
-      const existingHmr =
-        typeof config.server?.hmr === "object" ? config.server.hmr : {};
-      const hmrHost = getRequiredDevelopmentEnv("VITE_HMR_HOST");
-      const hmrProtocol = getRequiredDevelopmentEnv("VITE_HMR_PROTOCOL");
-      const hmrClientPort = parseRequiredDevelopmentPort(
-        "VITE_HMR_CLIENT_PORT",
-      );
-      const devPort = parseRequiredDevelopmentPort("VITE_DEV_PORT");
-      const origin =
-        process.env.VITE_PUBLIC_ADMIN_BASE_URL || process.env.VITE_ORIGIN;
-
-      return {
-        ...config,
-        plugins: [
-          medusaDashboardRouterFutureFlagPlugin(),
-          ...(config.plugins ?? []),
-        ],
-        resolve: {
-          ...config.resolve,
-          alias: getAdminViteAliases(config.resolve?.alias),
-        },
-        ...(isDevelopment
-          ? {
-              server: {
-                ...config.server,
-                host: parseViteHost(getRequiredDevelopmentEnv("VITE_HOST")),
-                strictPort: true,
-                port: devPort,
-                origin,
-                allowedHosts: adminAllowedHosts,
-                hmr: {
-                  ...existingHmr,
-                  protocol: hmrProtocol,
-                  host: hmrHost,
-                  clientPort: hmrClientPort,
-                },
-              },
-            }
-          : {}),
-      };
-    },
   },
   plugins,
   modules,

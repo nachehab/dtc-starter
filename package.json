@@ -1,12 +1,11 @@
 {
   "name": "dtc-starter-monorepo",
   "private": true,
-  "packageManager": "pnpm@10.33.2",
+  "packageManager": "pnpm@10.11.1",
   "engines": {
-    "node": ">=22 <23"
+    "node": ">=20 <21"
   },
   "scripts": {
-    "dev": "turbo dev",
     "prebuild": "node scripts/check-env-files.js && node scripts/check-no-localhost.js",
     "build": "turbo build",
     "postbuild": "node scripts/check-public-urls.js",
@@ -15,14 +14,11 @@
     "test": "turbo test",
     "backend:seed": "turbo run seed --filter=@dtc/backend",
     "backend:predeploy": "turbo run predeploy --filter=@dtc/backend",
-    "backend:dev": "turbo dev --filter=@dtc/backend",
-    "storefront:dev": "turbo dev --filter=@dtc/storefront",
     "healthcheck": "node scripts/check-medusa-health.js",
     "check:medusa-build-output": "node scripts/check-medusa-build-output.js",
     "check:versions": "node scripts/check-runtime-versions.js",
     "outdated": "pnpm outdated -r",
     "docker:up": "docker compose up -d --build",
-    "docker:dev": "docker compose -f docker-compose.yaml -f docker-compose.dev.yaml --profile dev up",
     "docker:logs": "docker compose logs -f",
     "docker:down": "docker compose down",
     "fix-image-urls": "node scripts/run-fix-image-urls.js",

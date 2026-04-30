@@ -7,9 +7,7 @@ const stripLeadingSlash = (value: string) => value.replace(/^\/+/, "");
 
 const getPublicAssetBaseUrl = () => {
   const value =
-    process.env.VITE_PUBLIC_ASSET_BASE_URL ||
     process.env.PUBLIC_ASSET_BASE_URL ||
-    process.env.VITE_PUBLIC_BACKEND_URL ||
     process.env.PUBLIC_BACKEND_URL ||
     "";
 

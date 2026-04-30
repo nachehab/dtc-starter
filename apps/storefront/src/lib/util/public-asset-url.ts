@@ -10,7 +10,6 @@ const stripLeadingSlash = (value: string) => value.replace(/^\/+/, "")
 const getPublicAssetBaseUrl = () => {
   const value =
     process.env.NEXT_PUBLIC_ASSET_BASE_URL ||
-    process.env.VITE_PUBLIC_ASSET_BASE_URL ||
     getPublicMedusaBackendURL()
 
   return stripTrailingSlash(value)

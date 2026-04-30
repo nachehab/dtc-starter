@@ -21,18 +21,6 @@ const backendKeys = [
   "COOKIE_SECRET",
   "COOKIE_SAME_SITE",
   "COOKIE_SECURE",
-  "VITE_HOST",
-  "VITE_ORIGIN",
-  "VITE_ALLOWED_HOSTS",
-  "VITE_PUBLIC_HOST",
-  "VITE_PUBLIC_ADMIN_BASE_URL",
-  "VITE_PUBLIC_BACKEND_URL",
-  "VITE_PUBLIC_ASSET_BASE_URL",
-  "VITE_HMR_PROTOCOL",
-  "VITE_HMR_HOST",
-  "VITE_HMR_CLIENT_PORT",
-  "VITE_DEV_PORT",
-  "INTERNAL_MEDUSA_URL",
   "DB_NAME",
   "MEDUSA_ADMIN_ONBOARDING_TYPE",
   "DISABLE_MEDUSA_ADMIN",
@@ -104,14 +92,6 @@ const files = [
     ),
   },
   {
-    label: "backend development template",
-    file: "apps/backend/.env.development.template",
-    requiredKeys: backendKeys.concat(backendTemplateOnlyKeys),
-    forbiddenKeys: storefrontKeys.filter(
-      (key) => !keysAllowedInBothApps.includes(key),
-    ),
-  },
-  {
     label: "backend production template",
     file: "apps/backend/.env.production.template",
     requiredKeys: backendKeys.concat(backendTemplateOnlyKeys),
@@ -130,14 +110,6 @@ const files = [
   {
     label: "storefront example",
     file: "apps/storefront/.env.example",
-    requiredKeys: storefrontKeys,
-    forbiddenKeys: backendKeys.filter(
-      (key) => !keysAllowedInBothApps.includes(key),
-    ),
-  },
-  {
-    label: "storefront development template",
-    file: "apps/storefront/.env.development.template",
     requiredKeys: storefrontKeys,
     forbiddenKeys: backendKeys.filter(
       (key) => !keysAllowedInBothApps.includes(key),
