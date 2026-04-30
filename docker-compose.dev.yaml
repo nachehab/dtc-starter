@@ -1,4 +1,4 @@
-# Development override: NO Vite admin. Run built admin via Medusa to avoid proxy issues.
+# Development override: live-reload only; public URL/auth/cookie env stays in app env files.
 services:
   medusa:
     profiles:
@@ -9,15 +9,15 @@ services:
     environment:
       NODE_ENV: development
       PORT: 9000
-    working_dir: /server
-    command: sh /server/scripts/start-medusa-dev-built-admin.sh
+    working_dir: /server/apps/backend
+    command: pnpm dev
     ports:
       - "9000:9000"
+      - "5173:5173"
     volumes:
       - .:/server
       - /server/node_modules
       - /server/apps/backend/node_modules
-      - /server/apps/backend/.medusa
 
   storefront:
     profiles:

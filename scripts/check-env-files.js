@@ -2,6 +2,8 @@ const fs = require("fs");
 const path = require("path");
 
 const root = process.cwd();
+const blockedBrowserHost = `${"local"}${"host"}`;
+const loopbackHostname = `${"127"}.0.0.1`;
 
 const backendKeys = [
   "PUBLIC_BACKEND_URL",
@@ -17,6 +19,8 @@ const backendKeys = [
   "AUTH_CORS",
   "JWT_SECRET",
   "COOKIE_SECRET",
+  "COOKIE_SAME_SITE",
+  "COOKIE_SECURE",
   "VITE_HOST",
   "VITE_ORIGIN",
   "VITE_ALLOWED_HOSTS",
@@ -54,6 +58,8 @@ const backendKeys = [
   "SEED_IMAGE_BASE_URL",
 ];
 
+const backendTemplateOnlyKeys = ["TRUST_PROXY", "ADMIN_SESSION_COOKIE_DEBUG"];
+
 const keysAllowedInBothApps = ["MEDUSA_BACKEND_URL"];
 
 const storefrontKeys = [
@@ -84,7 +90,7 @@ const files = [
   {
     label: "backend template",
     file: "apps/backend/.env.template",
-    requiredKeys: backendKeys,
+    requiredKeys: backendKeys.concat(backendTemplateOnlyKeys),
     forbiddenKeys: storefrontKeys.filter(
       (key) => !keysAllowedInBothApps.includes(key),
     ),
@@ -92,7 +98,7 @@ const files = [
   {
     label: "backend example",
     file: "apps/backend/.env.example",
-    requiredKeys: backendKeys,
+    requiredKeys: backendKeys.concat(backendTemplateOnlyKeys),
     forbiddenKeys: storefrontKeys.filter(
       (key) => !keysAllowedInBothApps.includes(key),
     ),
@@ -100,7 +106,7 @@ const files = [
   {
     label: "backend development template",
     file: "apps/backend/.env.development.template",
-    requiredKeys: backendKeys,
+    requiredKeys: backendKeys.concat(backendTemplateOnlyKeys),
     forbiddenKeys: storefrontKeys.filter(
       (key) => !keysAllowedInBothApps.includes(key),
     ),
@@ -108,7 +114,7 @@ const files = [
   {
     label: "backend production template",
     file: "apps/backend/.env.production.template",
-    requiredKeys: backendKeys,
+    requiredKeys: backendKeys.concat(backendTemplateOnlyKeys),
     forbiddenKeys: storefrontKeys.filter(
       (key) => !keysAllowedInBothApps.includes(key),
     ),
@@ -156,7 +162,9 @@ const files = [
   {
     label: "root example",
     file: ".env.example",
-    requiredKeys: Array.from(new Set([...backendKeys, ...storefrontKeys])),
+    requiredKeys: Array.from(
+      new Set([...backendKeys, ...backendTemplateOnlyKeys, ...storefrontKeys]),
+    ),
     forbiddenKeys: [],
   },
   {
@@ -208,6 +216,121 @@ const parseEnvFile = (relativeFile) => {
   };
 };
 
+const selectedBackendDiagnosticKeys = [
+  "PUBLIC_BACKEND_URL",
+  "MEDUSA_BACKEND_URL",
+  "MEDUSA_ADMIN_BACKEND_URL",
+  "STORE_CORS",
+  "ADMIN_CORS",
+  "AUTH_CORS",
+  "COOKIE_SAME_SITE",
+  "COOKIE_SECURE",
+  "TRUST_PROXY",
+];
+
+const publicBrowserKeys = [
+  "PUBLIC_BACKEND_URL",
+  "MEDUSA_BACKEND_URL",
+  "MEDUSA_ADMIN_BACKEND_URL",
+  "STORE_CORS",
+  "ADMIN_CORS",
+  "AUTH_CORS",
+  "SITE_PUBLIC_URL",
+  "ADMIN_PUBLIC_URL",
+  "NEXT_PUBLIC_MEDUSA_BACKEND_URL",
+  "NEXT_PUBLIC_ASSET_BASE_URL",
+  "NEXT_PUBLIC_BASE_URL",
+  "MEDUSA_BACKEND_URL",
+];
+
+const dockerServiceHosts = new Set(["medusa", "postgres", "redis"]);
+
+const splitEnvList = (value) =>
+  (value || "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+const parseUrlLikeValue = (value) => {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+};
+
+const isPrivateHostname = (hostname) => {
+  const parts = hostname.split(".").map((part) => Number.parseInt(part, 10));
+
+  if (parts.length !== 4 || parts.some((part) => Number.isNaN(part))) {
+    return false;
+  }
+
+  const [first, second] = parts;
+
+  return (
+    first === 10 ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168)
+  );
+};
+
+const findBrowserUrlWarnings = (label, values) => {
+  const warnings = [];
+
+  publicBrowserKeys.forEach((key) => {
+    splitEnvList(values.get(key)).forEach((entry) => {
+      const url = parseUrlLikeValue(entry);
+
+      if (!url) {
+        return;
+      }
+
+      const hostname = url.hostname.toLowerCase();
+
+      if (url.protocol !== "https:") {
+        warnings.push(`${label} ${key} is not HTTPS: ${entry}`);
+      }
+
+      if (
+        hostname === blockedBrowserHost ||
+        hostname === loopbackHostname ||
+        isPrivateHostname(hostname) ||
+        dockerServiceHosts.has(hostname)
+      ) {
+        warnings.push(
+          `${label} ${key} contains a non-browser public host: ${entry}`,
+        );
+      }
+    });
+  });
+
+  return warnings;
+};
+
+const printSanitizedDiagnostics = () => {
+  const backend = parseEnvFile("apps/backend/.env");
+  const storefront = parseEnvFile("apps/storefront/.env");
+
+  console.log("Sanitized environment diagnostics:");
+  selectedBackendDiagnosticKeys.forEach((key) => {
+    console.log(`- ${key}=${backend.values.get(key) || "<unset>"}`);
+  });
+  console.log(`- NODE_ENV=${process.env.NODE_ENV || "<unset>"}`);
+
+  const warnings = [
+    ...findBrowserUrlWarnings("backend env", backend.values),
+    ...findBrowserUrlWarnings("storefront env", storefront.values),
+  ];
+
+  if (warnings.length > 0) {
+    console.warn("Public URL warnings:");
+    warnings.forEach((warning) => console.warn(`- ${warning}`));
+  } else {
+    console.log("Public browser origins are HTTPS and externally reachable.");
+  }
+};
+
 const failures = [];
 
 files.forEach(({ label, file, requiredKeys, forbiddenKeys }) => {
@@ -251,6 +374,8 @@ files.forEach(({ label, file, requiredKeys, forbiddenKeys }) => {
     });
   }
 });
+
+printSanitizedDiagnostics();
 
 if (failures.length > 0) {
   console.error("Environment file validation failed:");

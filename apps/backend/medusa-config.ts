@@ -79,6 +79,16 @@ const parseBooleanEnv = (value: string | undefined, fallback: boolean) => {
   return ["1", "true", "yes", "on"].includes(value.toLowerCase());
 };
 
+const parseTrustProxyEnv = (value: string | undefined) => {
+  const parsed = Number.parseInt(value || "1", 10);
+
+  if (Number.isNaN(parsed) || parsed < 0) {
+    throw new Error("TRUST_PROXY must be a non-negative integer");
+  }
+
+  return parsed;
+};
+
 const parseCookieSameSite = (
   value: string | undefined,
   fallback: CookieSameSite,
@@ -131,8 +141,10 @@ const cookieSecure = parseBooleanEnv(
 );
 const cookieSameSite = parseCookieSameSite(
   process.env.COOKIE_SAME_SITE,
-  cookieSecure ? "none" : "lax",
+  "none",
 );
+const trustProxy = parseTrustProxyEnv(process.env.TRUST_PROXY);
+process.env.TRUST_PROXY = String(trustProxy);
 
 if (cookieSameSite === "none" && !cookieSecure) {
   throw new Error("COOKIE_SAME_SITE=none requires COOKIE_SECURE=true");

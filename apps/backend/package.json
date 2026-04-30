@@ -13,7 +13,7 @@
     "medusa"
   ],
   "scripts": {
-    "dev": "medusa develop",
+    "dev": "medusa develop --host 0.0.0.0",
     "build": "medusa build",
     "predeploy": "medusa db:migrate",
     "start": "medusa start",

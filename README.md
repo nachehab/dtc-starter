@@ -51,11 +51,14 @@ DATABASE_URL=postgres://postgres:postgres@postgres:5432/medusa-store
 REDIS_URL=redis://redis:6379
 CACHE_REDIS_URL=redis://redis:6379
 LOCKING_REDIS_URL=redis://redis:6379
-STORE_CORS=https://ridersadmin.nchehab.ddns.net
+STORE_CORS=https://ridersparadise.nchehab.ddns.net,https://ridersadmin.nchehab.ddns.net
 ADMIN_CORS=https://ridersadmin.nchehab.ddns.net
-AUTH_CORS=https://ridersadmin.nchehab.ddns.net
+AUTH_CORS=https://ridersadmin.nchehab.ddns.net,https://ridersparadise.nchehab.ddns.net
 JWT_SECRET=<secure-random-value>
 COOKIE_SECRET=<secure-random-value>
+COOKIE_SAME_SITE=none
+COOKIE_SECURE=true
+TRUST_PROXY=1
 DISABLE_MEDUSA_ADMIN=false
 MEDUSA_WORKER_MODE=server
 PORT=9000
@@ -67,6 +70,7 @@ Minimum storefront values:
 NEXT_PUBLIC_MEDUSA_BACKEND_URL=https://ridersadmin.nchehab.ddns.net
 MEDUSA_BACKEND_URL=https://ridersadmin.nchehab.ddns.net
 NEXT_PUBLIC_BASE_URL=https://ridersparadise.nchehab.ddns.net
+NEXT_PUBLIC_ASSET_BASE_URL=https://ridersadmin.nchehab.ddns.net
 NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=
 NEXT_PUBLIC_DEFAULT_REGION=ca
 ```
@@ -119,6 +123,10 @@ Backend env file: `apps/backend/.env`
 | `AUTH_CORS`                    | Browser origins allowed for auth flows.                                                                     |
 | `JWT_SECRET`                   | Backend JWT signing secret.                                                                                 |
 | `COOKIE_SECRET`                | Backend cookie signing secret.                                                                              |
+| `COOKIE_SAME_SITE`             | Session cookie SameSite policy. Use `none` behind the HTTPS reverse proxy.                                  |
+| `COOKIE_SECURE`                | Whether session cookies require HTTPS. Defaults from `PUBLIC_BACKEND_URL`; set `true` for this deployment.  |
+| `TRUST_PROXY`                  | Express reverse-proxy trust hop count. Use `1` for the HTTPS proxy in front of Docker.                      |
+| `ADMIN_SESSION_COOKIE_DEBUG`   | Enables sanitized admin/auth cookie diagnostics. Use `true` only while debugging.                           |
 | `VITE_HOST`                    | Medusa admin Vite bind host.                                                                                |
 | `VITE_ORIGIN`                  | Public admin/backend origin used by Vite.                                                                   |
 | `VITE_ALLOWED_HOSTS`           | Additional admin Vite allowed hosts for LAN/proxy development.                                              |
@@ -220,15 +228,21 @@ Keep `STORE_CORS`, `ADMIN_CORS`, `AUTH_CORS`, `JWT_SECRET`, `COOKIE_SECRET`, `ME
 
 If Medusa Admin loops through `/app/login`, `/cloud/auth`, `/app/?token=...`, `/app`, and back to `/app/login`, the browser is not storing or resending the `connect.sid` session cookie. Behind an HTTPS reverse proxy, the backend must issue a cookie with `Secure=true` and `SameSite=None`, and Express must see the original request as HTTPS through forwarded headers.
 
-Backend env for the admin-only deployment must use the public HTTPS origin:
+Backend env for this deployment must use the public HTTPS origins:
 
 ```env
-STORE_CORS=https://ridersadmin.nchehab.ddns.net
-ADMIN_CORS=https://ridersadmin.nchehab.ddns.net
-AUTH_CORS=https://ridersadmin.nchehab.ddns.net
+PUBLIC_BACKEND_URL=https://ridersadmin.nchehab.ddns.net
+PUBLIC_ASSET_BASE_URL=https://ridersadmin.nchehab.ddns.net
 MEDUSA_BACKEND_URL=https://ridersadmin.nchehab.ddns.net
 MEDUSA_ADMIN_BACKEND_URL=https://ridersadmin.nchehab.ddns.net
-PUBLIC_BACKEND_URL=https://ridersadmin.nchehab.ddns.net
+STORE_CORS=https://ridersparadise.nchehab.ddns.net,https://ridersadmin.nchehab.ddns.net
+ADMIN_CORS=https://ridersadmin.nchehab.ddns.net
+AUTH_CORS=https://ridersadmin.nchehab.ddns.net,https://ridersparadise.nchehab.ddns.net
+SITE_PUBLIC_URL=https://ridersparadise.nchehab.ddns.net
+ADMIN_PUBLIC_URL=https://ridersadmin.nchehab.ddns.net
+COOKIE_SAME_SITE=none
+COOKIE_SECURE=true
+TRUST_PROXY=1
 ```
 
 The reverse proxy must forward the external HTTPS context:
@@ -240,19 +254,34 @@ proxy_set_header X-Forwarded-Host $host;
 proxy_set_header X-Forwarded-Port 443;
 ```
 
-Medusa v2's Express loader sets `trust proxy` to `1`; keep that behavior intact so secure cookies are allowed when TLS terminates at the proxy. The backend config also sets `projectConfig.cookieOptions.sameSite` to `none` and `projectConfig.cookieOptions.secure` to `true`.
+Medusa v2.14 reads session cookie settings from `projectConfig.cookieOptions`. This project keeps `sameSite` and `secure` env-driven and defaults `TRUST_PROXY` to `1` for the HTTPS proxy in front of Docker.
 
 Checklist:
 
-- Browser has a `connect.sid` cookie for `ridersadmin.nchehab.ddns.net`.
-- `COOKIE_SECRET` and `JWT_SECRET` are stable and do not change across restarts.
-- `AUTH_CORS` is exactly `https://ridersadmin.nchehab.ddns.net`.
-- `ADMIN_CORS` is exactly `https://ridersadmin.nchehab.ddns.net`.
-- `MEDUSA_BACKEND_URL`, `MEDUSA_ADMIN_BACKEND_URL`, and `PUBLIC_BACKEND_URL` use the HTTPS public domain.
-- No browser-facing env var points to `localhost`, `127.0.0.1`, a private IP, or a Docker service name.
-- The reverse proxy sends `X-Forwarded-Proto=https`.
+1. Use only `https://ridersadmin.nchehab.ddns.net/app` for admin access.
+2. In DevTools -> Application -> Cookies, confirm `connect.sid` exists for `ridersadmin.nchehab.ddns.net`.
+3. `connect.sid` must have `Secure` and `SameSite=None`.
+4. In Network, `GET /admin/users/me` must return `200` after login.
+5. The `/admin/users/me` request must include `Cookie: connect.sid`.
+6. The reverse proxy must pass `Host`, `X-Forwarded-Proto=https`, `X-Forwarded-Host`, and `X-Forwarded-Port=443`.
+7. Check the dev container env without printing secrets:
 
-To validate the fix, log in at `https://ridersadmin.nchehab.ddns.net/app`, then confirm `GET /admin/users/me` returns `200` and the browser has a `connect.sid` cookie for `ridersadmin.nchehab.ddns.net` with `Secure=true` and `SameSite=None`. Backend logs include sanitized `[admin-session-cookie-debug]` entries for `/admin/auth`, `/auth`, `/cloud/auth`, and `/admin/users/me` that show whether `connect.sid` was present and whether `Set-Cookie` included the expected attributes.
+```sh
+docker exec -it medusa_backend_dev sh -lc 'printenv | grep -E "CORS|BACKEND_URL|PUBLIC|COOKIE|TRUST|NODE_ENV|PORT" | sort'
+```
+
+8. Set `ADMIN_SESSION_COOKIE_DEBUG=true`, restart Medusa, and inspect sanitized logs for forwarded headers, `has_connect_sid`, `set_cookie_has_secure`, and `set_cookie_has_samesite_none`.
+
+Dev validation:
+
+```sh
+docker compose -f docker-compose.yaml -f docker-compose.dev.yaml --profile dev down
+docker compose -f docker-compose.yaml -f docker-compose.dev.yaml --profile dev build --no-cache medusa
+docker compose -f docker-compose.yaml -f docker-compose.dev.yaml --profile dev up medusa
+docker logs -f medusa_backend_dev | grep -Ei "admin-session-cookie-debug|set-cookie|admin/users/me|cloud/auth|cors|cookie|forwarded"
+```
+
+Expected: `x_forwarded_proto=https`, `Set-Cookie` includes `Secure` and `SameSite=None`, `has_connect_sid` becomes `true` after login, `/admin/users/me` returns `200`, and the admin stops reloading.
 
 ## Storefront Docker Isolation
 
@@ -390,9 +419,14 @@ NEXT_PUBLIC_MEDUSA_BACKEND_URL=https://ridersadmin.nchehab.ddns.net
 NEXT_PUBLIC_ASSET_BASE_URL=https://ridersadmin.nchehab.ddns.net
 NEXT_PUBLIC_BASE_URL=https://ridersparadise.nchehab.ddns.net
 INTERNAL_MEDUSA_URL=http://medusa:9000
-STORE_CORS=https://ridersadmin.nchehab.ddns.net
+STORE_CORS=https://ridersparadise.nchehab.ddns.net,https://ridersadmin.nchehab.ddns.net
 ADMIN_CORS=https://ridersadmin.nchehab.ddns.net
-AUTH_CORS=https://ridersadmin.nchehab.ddns.net
+AUTH_CORS=https://ridersadmin.nchehab.ddns.net,https://ridersparadise.nchehab.ddns.net
+SITE_PUBLIC_URL=https://ridersparadise.nchehab.ddns.net
+ADMIN_PUBLIC_URL=https://ridersadmin.nchehab.ddns.net
+COOKIE_SAME_SITE=none
+COOKIE_SECURE=true
+TRUST_PROXY=1
 VITE_PUBLIC_HOST=ridersadmin.nchehab.ddns.net
 VITE_PUBLIC_ADMIN_BASE_URL=https://ridersadmin.nchehab.ddns.net
 VITE_PUBLIC_BACKEND_URL=https://ridersadmin.nchehab.ddns.net
