@@ -23,6 +23,10 @@ services:
   medusa:
     build:
       context: .
+      dockerfile: Dockerfile
+      secrets:
+        - backend_env
+    image: aydenmedusa-medusa:latest
     container_name: medusa_backend
     restart: unless-stopped
     depends_on:
@@ -34,7 +38,15 @@ services:
       - "9000:9000"
     env_file:
       - apps/backend/.env
+    environment:
+      NODE_ENV: production
+      PORT: 9000
+      DISABLE_MEDUSA_ADMIN: "false"
+      MEDUSA_WORKER_MODE: server
     working_dir: /server/apps/backend
 
 volumes:
   postgres_data:
+secrets:
+  backend_env:
+    file: ./apps/backend/.env

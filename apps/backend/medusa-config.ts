@@ -6,14 +6,8 @@ loadEnv(process.env.NODE_ENV || "production", process.cwd());
 
 const isPackageBuild = process.env.npm_lifecycle_event === "build";
 const buildEnvFallbacks: Record<string, string> = {
-  PUBLIC_BACKEND_URL: "https://your-domain",
-  MEDUSA_BACKEND_URL: "https://your-domain",
-  MEDUSA_ADMIN_BACKEND_URL: "https://your-domain",
   DATABASE_URL: "postgres://postgres:postgres@postgres:5432/medusa-store",
   REDIS_URL: "redis://redis:6379",
-  STORE_CORS: "https://your-storefront-domain,https://your-domain",
-  ADMIN_CORS: "https://your-domain",
-  AUTH_CORS: "https://your-domain",
   JWT_SECRET: "build-time-jwt-secret-not-used-at-runtime",
   COOKIE_SECRET: "build-time-cookie-secret-not-used-at-runtime",
 };
